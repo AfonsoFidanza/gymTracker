@@ -271,6 +271,7 @@
     .set-weight, .set-reps{max-width:none; flex:1; min-width:0; font-size:16px; padding:11px 8px;}
     .qa-btn{width:36px; height:36px; font-size:17px;}
     .set-confirm-btn{width:36px; height:36px; font-size:16px;}
+    .reorder-btn{width:34px; height:30px; font-size:14px;}
     .row-actions .btn.small{flex:1; min-width:0;}
     #exerciseFormArea.focus-mode .exercise-block.focus-active{padding:16px;}
   }
@@ -288,6 +289,15 @@
     font-size:12px; color:var(--accent); background:rgba(5,150,105,.08); border:1px solid rgba(5,150,105,.25);
     border-radius:8px; padding:7px 10px; margin-bottom:10px;
   }
+  .ex-header{display:flex; align-items:flex-start; justify-content:space-between; gap:8px;}
+  .ex-header-main{flex:1; min-width:0;}
+  .ex-reorder{display:flex; flex-direction:column; gap:4px; flex:none;}
+  .reorder-btn{
+    width:28px; height:24px; border-radius:6px; border:1px solid var(--border); background:var(--panel2);
+    color:var(--text); font-size:12px; cursor:pointer; line-height:1; padding:0;
+  }
+  .reorder-btn:hover{border-color:var(--accent); color:var(--accent);}
+  .reorder-btn:disabled{opacity:.3; cursor:not-allowed;}
   .qa-btn{
     width:26px; height:26px; flex:none; border-radius:6px; border:1px solid var(--border); background:var(--panel2);
     color:var(--text); font-size:14px; font-weight:700; cursor:pointer; line-height:1; padding:0;
@@ -987,8 +997,16 @@ function buildExerciseBlock(exDef, isExtra){
   }
   const lastTimeHtml = isExtra ? '<div class="ex-last-time-slot"></div>' : formatLastTimeLine(lastEx);
   div.innerHTML = `
-    ${nameHtml}
-    ${muscleHtml}
+    <div class="ex-header">
+      <div class="ex-header-main">
+        ${nameHtml}
+        ${muscleHtml}
+      </div>
+      <div class="ex-reorder">
+        <button type="button" class="reorder-btn move-up-btn" title="Mover para cima">▲</button>
+        <button type="button" class="reorder-btn move-down-btn" title="Mover para baixo">▼</button>
+      </div>
+    </div>
     ${lastTimeHtml}
     <label class="warmup-toggle">
       <input type="checkbox" class="ex-warmup-input">
@@ -1035,6 +1053,8 @@ function buildExerciseBlock(exDef, isExtra){
     updateFocusNav();
     scheduleDraftSave();
   });
+  div.querySelector('.move-up-btn').addEventListener('click', ()=> moveBlock(div, -1));
+  div.querySelector('.move-down-btn').addEventListener('click', ()=> moveBlock(div, 1));
   if(isExtra){
     const nameInput = div.querySelector('.ex-name-input');
     nameInput.addEventListener('blur', ()=>{
@@ -1061,8 +1081,16 @@ function buildCardioBlock(exDef){
   const pDur = lastSt && lastSt.duration_min!==null && lastSt.duration_min!==undefined ? lastSt.duration_min : '';
   const pDist = lastSt && lastSt.distance_km!==null && lastSt.distance_km!==undefined ? lastSt.distance_km : '';
   div.innerHTML = `
-    <h4>🏃 ${exDef.name}</h4>
-    <div class="ex-meta">${exDef.muscle||'Cardio'}</div>
+    <div class="ex-header">
+      <div class="ex-header-main">
+        <h4>🏃 ${exDef.name}</h4>
+        <div class="ex-meta">${exDef.muscle||'Cardio'}</div>
+      </div>
+      <div class="ex-reorder">
+        <button type="button" class="reorder-btn move-up-btn" title="Mover para cima">▲</button>
+        <button type="button" class="reorder-btn move-down-btn" title="Mover para baixo">▼</button>
+      </div>
+    </div>
     ${lastTimeHtml}
     <div class="form-row" style="margin-bottom:4px;">
       <div class="field"><label>Duração (min)</label><input type="text" class="cardio-duration" placeholder="ex: 25" value="${pDur}"></div>
@@ -1078,6 +1106,8 @@ function buildCardioBlock(exDef){
     updateFocusNav();
     scheduleDraftSave();
   });
+  div.querySelector('.move-up-btn').addEventListener('click', ()=> moveBlock(div, -1));
+  div.querySelector('.move-down-btn').addEventListener('click', ()=> moveBlock(div, 1));
   return div;
 }
 
@@ -1193,9 +1223,36 @@ function getExerciseBlocks(){
   return Array.from(document.querySelectorAll('#exerciseFormArea .exercise-block'));
 }
 
+// Permite reordenar os exercícios dentro do treino usando as setas ▲▼ de cada bloco.
+function moveBlock(block, dir){
+  const area = document.getElementById('exerciseFormArea');
+  const blocks = getExerciseBlocks();
+  const idx = blocks.indexOf(block);
+  const newIdx = idx + dir;
+  if(idx === -1 || newIdx < 0 || newIdx >= blocks.length) return;
+  if(dir === -1){
+    area.insertBefore(block, blocks[newIdx]);
+  } else {
+    area.insertBefore(blocks[newIdx], block);
+  }
+  updateFocusNav();
+  scheduleDraftSave();
+}
+
+function updateReorderButtons(){
+  const blocks = getExerciseBlocks();
+  blocks.forEach((b,i)=>{
+    const up = b.querySelector('.move-up-btn');
+    const down = b.querySelector('.move-down-btn');
+    if(up) up.disabled = (i===0);
+    if(down) down.disabled = (i===blocks.length-1);
+  });
+}
+
 function updateFocusNav(){
   const nav = document.getElementById('focusNav');
   const blocks = getExerciseBlocks();
+  updateReorderButtons();
   if(!focusModeActive || !blocks.length){
     nav.classList.remove('show');
     blocks.forEach(b=> b.classList.remove('focus-active'));
