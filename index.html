@@ -209,17 +209,22 @@
   .home-suggest-item{font-size:13px; color:#166534; padding:4px 0;}
 
   @media (max-width: 720px){
-    header{padding:14px 16px; flex-wrap:wrap; gap:10px;}
-    header h1{font-size:16px;}
-    nav{padding:8px 16px; top:60px;}
-    main{padding:16px 16px 90px;}
+    header{padding:12px 14px; flex-wrap:wrap; gap:8px;}
+    header h1{font-size:15px;}
+    header .sub{font-size:11px;}
+    header > div:last-child{flex-wrap:wrap; justify-content:flex-end; gap:6px; width:100%;}
+    header .btn{padding:7px 11px; font-size:12px; min-height:32px;}
+    .sync-status{font-size:10px;}
+    nav{padding:8px 12px; top:auto; gap:4px;}
+    nav button{padding:8px 12px; font-size:13px;}
+    main{padding:14px 12px 90px;}
     .cal-page{padding:16px;}
     .cal-page-title{font-size:18px;}
     .cal-page-day{font-size:13px; border-radius:9px;}
     .form-row{flex-direction:column; gap:10px;}
     .form-row .field{width:100%;}
     #inputDateDisplay{width:100%;}
-    .calendar-popup{width:100%; max-width:340px;}
+    .calendar-popup{width:100%; max-width:none; left:0; right:0;}
     .row-actions{flex-wrap:wrap;}
     #saveWorkoutBtn{
       position:sticky; bottom:12px; width:100%; margin-left:0 !important;
@@ -227,6 +232,47 @@
     }
     .chart-grid{grid-template-columns:1fr;}
     .plan-grid{grid-template-columns:1fr;}
+
+    /* Formulário de exercícios: cartões maiores, mais fáceis de tocar */
+    .form-section{padding:14px; border-radius:10px;}
+    .exercise-block{padding:12px;}
+    .adicionar-toolbar{flex-direction:column; align-items:stretch; gap:8px;}
+    .adicionar-toolbar #repeatLastBtn{width:100%;}
+    .focus-toggle{padding:9px 4px;}
+    .picker-count{display:inline-block !important; margin-left:0; margin-top:4px;}
+    .field label{display:flex; flex-wrap:wrap; align-items:center; gap:4px;}
+    #exercisePicker{width:100%; font-size:15px; padding:11px 10px;}
+    #treinoSelect{width:100%;}
+    .draft-banner{flex-direction:column; align-items:stretch;}
+    .draft-banner div{display:flex; gap:8px;}
+    .draft-banner .btn{flex:1;}
+
+    /* Tabela de sets: passa de colunas apertadas para cartões empilhados */
+    .sets-table, .sets-table tbody{display:block; width:100%;}
+    .sets-table thead{display:none;}
+    .sets-table tr{
+      display:grid;
+      grid-template-columns:26px 1fr auto;
+      grid-template-areas:
+        "num weight weight"
+        "num reps confirm";
+      column-gap:8px; row-gap:8px; align-items:center;
+      background:var(--panel); border:1px solid var(--border); border-radius:12px;
+      padding:10px 12px; margin-bottom:10px;
+    }
+    .sets-table td{padding:0;}
+    .sets-table td:nth-child(1){grid-area:num; text-align:center; font-weight:700; color:var(--muted); font-size:13px; align-self:start;}
+    .sets-table td:nth-child(2){grid-area:weight;}
+    .sets-table td:nth-child(3){grid-area:reps;}
+    .sets-table td:nth-child(4){grid-area:confirm;}
+    .set-weight-wrap, .set-reps-wrap{width:100%;}
+    .set-weight-wrap::before{content:'Peso:'; font-size:11px; font-weight:700; color:var(--muted); flex:none; margin-right:2px;}
+    .set-reps-wrap::before{content:'Reps:'; font-size:11px; font-weight:700; color:var(--muted); flex:none; margin-right:2px;}
+    .set-weight, .set-reps{max-width:none; flex:1; min-width:0; font-size:16px; padding:11px 8px;}
+    .qa-btn{width:36px; height:36px; font-size:17px;}
+    .set-confirm-btn{width:36px; height:36px; font-size:16px;}
+    .row-actions .btn.small{flex:1; min-width:0;}
+    #exerciseFormArea.focus-mode .exercise-block.focus-active{padding:16px;}
   }
   .exercise-block{border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:12px; background:var(--panel2);}
   .exercise-block h4{margin:0 0 3px; font-size:14px;}
