@@ -416,6 +416,8 @@
   <div style="display:flex; gap:10px; align-items:center;">
     <span class="sync-status" id="syncStatus"><span class="sync-dot" id="syncDot"></span><span id="syncText">a sincronizar...</span></span>
     <button class="btn" id="exportBtn">⬇️ Exportar (.csv)</button>
+    <button class="btn" id="importBtn">⬆️ Importar (.csv)</button>
+    <input type="file" id="importFileInput" accept=".csv" style="display:none;">
     <button class="btn danger" id="logoutBtn">Sair</button>
   </div>
 </header>
@@ -623,7 +625,9 @@ const firebaseConfig = {
 
 let extraSessions = [];
 let firestoreUnsub = null;
-let DOC_REF = null;
+let SESSIONS_COL = null;
+let LEGACY_DOC_REF = null;
+let DB_REF = null;
 
 function initFirebase(){
   if(firebaseConfig.apiKey.indexOf('COLA_AQUI') === 0){
@@ -634,7 +638,11 @@ function initFirebase(){
   const auth = firebase.auth();
   const db = firebase.firestore();
   db.enablePersistence({synchronizeTabs:true}).catch(()=>{ /* ok se já ativo noutro separador */ });
-  DOC_REF = db.collection('ginasio').doc('treinos_extra');
+  DB_REF = db;
+  // Cada treino é o seu próprio documento — assim um dispositivo nunca pode apagar
+  // sem querer o trabalho de outro dispositivo (ao contrário de guardar tudo num único array).
+  SESSIONS_COL = db.collection('ginasio_sessions');
+  LEGACY_DOC_REF = db.collection('ginasio').doc('treinos_extra');
 
   document.getElementById('loginBtn').addEventListener('click', ()=> doLogin(auth));
   document.getElementById('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(auth); });
@@ -676,9 +684,9 @@ function setSyncStatus(text, offline){
 
 function startFirestoreSync(){
   setSyncStatus('a sincronizar...', false);
-  firestoreUnsub = DOC_REF.onSnapshot(snap=>{
-    const data = snap.data();
-    extraSessions = (data && data.sessions) ? data.sessions : [];
+  migrateLegacyDocIfNeeded();
+  firestoreUnsub = SESSIONS_COL.onSnapshot(snap=>{
+    extraSessions = snap.docs.map(d=> Object.assign({}, d.data(), {_fsId: d.id}));
     setSyncStatus(snap.metadata.fromCache ? 'offline (guardado localmente)' : 'sincronizado', snap.metadata.fromCache);
     renderSummary();
     renderProgress();
@@ -691,8 +699,41 @@ function startFirestoreSync(){
   });
 }
 
-function persistExtraSessions(){
-  return DOC_REF.set({ sessions: extraSessions }, { merge: true });
+// Gera um ID estável a partir do conteúdo do treino (data + treino + exercícios), para que,
+// se dois dispositivos tentarem migrar/gravar o mesmo treino ao mesmo tempo, acabem sempre
+// a escrever no mesmo documento em vez de criarem duplicados.
+function simpleHash(str){
+  let h = 0;
+  for(let i=0;i<str.length;i++){ h = (Math.imul(31, h) + str.charCodeAt(i)) | 0; }
+  return (h>>>0).toString(36);
+}
+function stableSessionId(session){
+  const base = JSON.stringify({date: session.date, treino: session.treino, exercises: session.exercises});
+  return (session.date||'sem-data') + '_' + (session.treino||'X') + '_' + simpleHash(base);
+}
+
+// Migração única (e segura de repetir) do antigo documento único 'ginasio/treinos_extra'
+// para a coleção nova, um documento por treino. Corre sempre que a app arranca; como os IDs
+// são determinísticos, correr várias vezes ou em vários dispositivos ao mesmo tempo é inofensivo.
+let legacyMigrationDone = false;
+function migrateLegacyDocIfNeeded(){
+  if(legacyMigrationDone || !LEGACY_DOC_REF) return;
+  legacyMigrationDone = true;
+  LEGACY_DOC_REF.get().then(doc=>{
+    const data = doc.data();
+    const legacySessions = (data && data.sessions) ? data.sessions : [];
+    if(!legacySessions.length) return;
+    const batch = DB_REF.batch();
+    legacySessions.forEach(s=>{
+      const ref = SESSIONS_COL.doc(stableSessionId(s));
+      batch.set(ref, s, {merge:true});
+    });
+    batch.commit().catch(err=> console.error('Erro na migração de treinos antigos', err));
+  }).catch(err=> console.error('Erro ao ler documento antigo de treinos', err));
+}
+
+function addSessionDoc(session){
+  return SESSIONS_COL.doc(stableSessionId(session)).set(session, {merge:true});
 }
 
 function allSessions(){
@@ -1493,8 +1534,7 @@ document.getElementById('saveWorkoutBtn').addEventListener('click', ()=>{
   const saveBtn = document.getElementById('saveWorkoutBtn');
   saveBtn.disabled = true;
   saveBtn.textContent = 'A guardar...';
-  extraSessions = extraSessions.concat([session]);
-  persistExtraSessions().then(()=>{
+  addSessionDoc(session).then(()=>{
     showToast('Treino guardado e sincronizado! 💪');
     clearDraft();
     setSelectedDate(null);
@@ -1585,8 +1625,12 @@ function renderHistory(){
 }
 
 function deleteSession(num){
-  extraSessions = extraSessions.filter(s=>s.num !== num);
-  persistExtraSessions().then(()=>{
+  const target = extraSessions.find(s=> s.num === num);
+  if(!target || !target._fsId){
+    showToast('Não foi possível encontrar este treino para apagar.');
+    return;
+  }
+  SESSIONS_COL.doc(target._fsId).delete().then(()=>{
     renderHistory();
     renderSummary();
   }).catch(err=> showToast('Erro ao apagar: ' + err.message));
@@ -1635,6 +1679,128 @@ document.getElementById('exportBtn').addEventListener('click', ()=>{
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+});
+
+// ---------- Importar (.csv) — para recuperar treinos a partir de um export antigo ----------
+function parseCsv(text){
+  if(text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const rows = [];
+  let row = [], field = '', inQuotes = false, i = 0;
+  while(i < text.length){
+    const c = text[i];
+    if(inQuotes){
+      if(c === '"'){
+        if(text[i+1] === '"'){ field += '"'; i += 2; continue; }
+        inQuotes = false; i++; continue;
+      }
+      field += c; i++; continue;
+    }
+    if(c === '"'){ inQuotes = true; i++; continue; }
+    if(c === ';'){ row.push(field); field=''; i++; continue; }
+    if(c === '\r'){ i++; continue; }
+    if(c === '\n'){ row.push(field); rows.push(row); row=[]; field=''; i++; continue; }
+    field += c; i++;
+  }
+  if(field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+
+function importSessionsFromCsv(text){
+  const rows = parseCsv(text).filter(r=> r.length && r.some(c=> (c||'').trim() !== ''));
+  if(!rows.length) return [];
+  const header = rows[0].map(h=>h.trim());
+  const idx = {};
+  header.forEach((h,i)=> idx[h] = i);
+  const need = ['número','dia da semana','treino','dia do mês','área do músculo','exercicio','sets'];
+  const missing = need.filter(h=> !(h in idx));
+  if(missing.length){
+    throw new Error('Formato de CSV não reconhecido (faltam colunas: ' + missing.join(', ') + ').');
+  }
+  const sessions = [];
+  let current = null;
+  for(let r=1; r<rows.length; r++){
+    const row = rows[r];
+    const numRaw = (row[idx['número']]||'').trim();
+    const dateRaw = (row[idx['dia do mês']]||'').trim();
+    const weekdayRaw = (row[idx['dia da semana']]||'').trim();
+    const treinoRaw = (row[idx['treino']]||'').trim();
+    if(numRaw || dateRaw){
+      current = { date: dateRaw, weekday: weekdayRaw, treino: treinoRaw, treino_raw: treinoRaw, source: 'app', exercises: [] };
+      sessions.push(current);
+    }
+    if(!current) continue;
+    const muscle = row[idx['área do músculo']]||'';
+    const name = (row[idx['exercicio']]||'').trim();
+    if(!name) continue;
+    const sets = [];
+    for(let si=1; si<=5; si++){
+      const wKey = 'Set '+si, rKey = 'reps '+si;
+      if(!(wKey in idx)) continue;
+      const wRaw = (row[idx[wKey]]||'').trim();
+      const rRaw = (row[idx[rKey]]||'').trim();
+      if((!wRaw || wRaw==='N/A') && (!rRaw || rRaw==='N/A')) continue;
+      const num = parseFloat(wRaw.replace(',', '.'));
+      sets.push({
+        weight: (!isNaN(num) && wRaw !== 'N/A' && wRaw !== '') ? num : null,
+        reps: (rRaw && rRaw !== 'N/A') ? rRaw : null,
+        raw_weight: wRaw && wRaw !== 'N/A' ? wRaw : null
+      });
+    }
+    if(!sets.length) continue;
+    current.exercises.push({
+      muscle: muscle || null,
+      name: name,
+      name_key: name.toLowerCase().trim(),
+      planned_sets: sets.length,
+      treino: treinoRaw,
+      sets: sets
+    });
+  }
+  return sessions.filter(s=> s.exercises.length && s.date);
+}
+
+document.getElementById('importBtn').addEventListener('click', ()=>{
+  document.getElementById('importFileInput').click();
+});
+document.getElementById('importFileInput').addEventListener('change', e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    let sessions;
+    try{
+      sessions = importSessionsFromCsv(reader.result);
+    }catch(err){
+      showToast('Erro ao ler o CSV: ' + err.message);
+      e.target.value = '';
+      return;
+    }
+    if(!sessions.length){
+      showToast('Não foram encontrados treinos válidos neste ficheiro.');
+      e.target.value = '';
+      return;
+    }
+    const ok = window.confirm(`Encontrados ${sessions.length} treino(s) neste ficheiro. Importar para a cloud? (treinos já existentes não ficam duplicados.)`);
+    if(!ok){ e.target.value = ''; return; }
+    const baseNum = nextNum();
+    sessions.forEach((s,i)=> s.num = baseNum + i);
+    const btn = document.getElementById('importBtn');
+    btn.disabled = true;
+    btn.textContent = 'A importar...';
+    Promise.all(sessions.map(s=> addSessionDoc(s)))
+      .then(()=>{
+        showToast(`${sessions.length} treino(s) importado(s) com sucesso! 💪`);
+      })
+      .catch(err=>{
+        showToast('Erro ao importar: ' + err.message);
+      })
+      .finally(()=>{
+        btn.disabled = false;
+        btn.textContent = '⬆️ Importar (.csv)';
+        e.target.value = '';
+      });
+  };
+  reader.readAsText(file, 'utf-8');
 });
 
 // ---------- Calendário personalizado (o nativo não é redimensionável) ----------
