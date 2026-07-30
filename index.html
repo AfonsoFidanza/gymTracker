@@ -271,6 +271,7 @@
     .set-weight, .set-reps{max-width:none; flex:1; min-width:0; font-size:16px; padding:11px 8px;}
     .qa-btn{width:36px; height:36px; font-size:17px;}
     .set-confirm-btn{width:36px; height:36px; font-size:16px;}
+    .set-remove-btn{width:36px; height:36px; font-size:16px;}
     .reorder-btn{width:34px; height:30px; font-size:14px;}
     .row-actions .btn.small{flex:1; min-width:0;}
     #exerciseFormArea.focus-mode .exercise-block.focus-active{padding:16px;}
@@ -304,11 +305,17 @@
   }
   .qa-btn:hover{border-color:var(--accent); color:var(--accent);}
   .set-weight-wrap, .set-reps-wrap{display:flex; align-items:center; gap:3px;}
+  .set-actions{display:flex; gap:4px;}
   .set-confirm-btn{
     width:30px; height:30px; border-radius:8px; border:1.5px solid var(--border); background:var(--panel2);
-    color:var(--muted); font-size:14px; cursor:pointer;
+    color:var(--muted); font-size:14px; cursor:pointer; flex:none;
   }
   .set-confirm-btn.confirmed{background:rgba(22,163,74,.18); border-color:#16a34a; color:#15803d;}
+  .set-remove-btn{
+    width:30px; height:30px; border-radius:8px; border:1.5px solid var(--border); background:var(--panel2);
+    color:#dc2626; font-size:14px; cursor:pointer; flex:none;
+  }
+  .set-remove-btn:hover{background:rgba(220,38,38,.08); border-color:#dc2626;}
   .draft-banner{
     background:rgba(5,150,105,.08); border:1px solid rgba(5,150,105,.3); border-radius:var(--radius);
     padding:14px 16px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
@@ -323,6 +330,7 @@
   #exerciseFormArea.focus-mode .sets-table input{padding:12px 10px; font-size:16px;}
   #exerciseFormArea.focus-mode .qa-btn{width:34px; height:34px; font-size:17px;}
   #exerciseFormArea.focus-mode .set-confirm-btn{width:36px; height:36px; font-size:16px;}
+  #exerciseFormArea.focus-mode .set-remove-btn{width:36px; height:36px; font-size:16px;}
   .focus-nav{
     display:none; align-items:center; justify-content:space-between; gap:10px;
     background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
@@ -1000,17 +1008,35 @@ function setRowHtml(n, weightVal, repsVal, confirmed){
       <input type="text" class="set-reps" placeholder="ex: 8-12" value="${repsVal!=null?repsVal:''}">
       <button type="button" class="qa-btn qa-r-plus">+</button>
     </div></td>
-    <td><button type="button" class="set-confirm-btn${confirmed?' confirmed':''}" title="Marcar set como feito">✓</button></td>`;
+    <td><div class="set-actions">
+      <button type="button" class="set-confirm-btn${confirmed?' confirmed':''}" title="Marcar set como feito">✓</button>
+      <button type="button" class="set-remove-btn" title="Remover este set">✕</button>
+    </div></td>`;
+}
+
+// Renumera a coluna "Set" depois de um set ser removido, para ficar sempre 1, 2, 3...
+function renumberSetRows(body){
+  Array.from(body.children).forEach((tr, i)=>{
+    const firstTd = tr.children[0];
+    if(firstTd) firstTd.textContent = i + 1;
+  });
 }
 
 function wireSetRow(tr){
   const wInput = tr.querySelector('.set-weight');
   const rInput = tr.querySelector('.set-reps');
   const confirmBtn = tr.querySelector('.set-confirm-btn');
+  const removeBtn = tr.querySelector('.set-remove-btn');
   tr.querySelector('.qa-w-minus').addEventListener('click', ()=> adjustWeight(wInput, -2.5));
   tr.querySelector('.qa-w-plus').addEventListener('click', ()=> adjustWeight(wInput, 2.5));
   tr.querySelector('.qa-r-minus').addEventListener('click', ()=> adjustReps(rInput, -1));
   tr.querySelector('.qa-r-plus').addEventListener('click', ()=> adjustReps(rInput, 1));
+  removeBtn.addEventListener('click', ()=>{
+    const body = tr.parentElement;
+    tr.remove();
+    renumberSetRows(body);
+    scheduleDraftSave();
+  });
   confirmBtn.addEventListener('click', ()=>{
     confirmBtn.classList.toggle('confirmed');
     scheduleDraftSave();
@@ -1056,7 +1082,6 @@ function buildExerciseBlock(exDef, isExtra){
     <table class="sets-table"><thead><tr><th>Set</th><th>Peso (kg)</th><th>Reps</th><th></th></tr></thead><tbody class="sets-body"></tbody></table>
     <div class="row-actions">
       <button type="button" class="btn small add-set-btn">+ set</button>
-      <button type="button" class="btn small danger remove-set-btn">- set</button>
       <button type="button" class="btn small danger remove-ex-btn" style="margin-left:auto;">retirar exercício</button>
     </div>
   `;
@@ -1084,10 +1109,6 @@ function buildExerciseBlock(exDef, isExtra){
     for(let i=0;i<defaultSets;i++) addSetRow(null);
   }
   div.querySelector('.add-set-btn').addEventListener('click', ()=>{ addSetRow(null); scheduleDraftSave(); });
-  div.querySelector('.remove-set-btn').addEventListener('click', ()=>{
-    if(body.lastElementChild) body.removeChild(body.lastElementChild);
-    scheduleDraftSave();
-  });
   div.querySelector('.remove-ex-btn').addEventListener('click', ()=>{
     div.remove();
     updateExerciseFormState();
