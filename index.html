@@ -721,17 +721,53 @@ function simpleHash(str){
 // Assinatura "de conteúdo" de um treino: ignora campos incidentais (músculo, se teve
 // aquecimento, sets planeados, etc.) e olha só ao que realmente define um treino como
 // sendo o mesmo — data, tipo de treino, exercícios, e peso/reps de cada set.
+// Os valores são normalizados (números convertidos, texto sem espaços a mais) para que
+// pequenas diferenças de formato (ex: peso guardado como "12" vs 12) não escondam duplicados.
 function normalizeSessionForHash(session){
+  const normWeight = w => {
+    if(w===null || w===undefined || w==='') return null;
+    const n = Number(w);
+    return isNaN(n) ? String(w).trim() : n;
+  };
+  const normStr = s => (s===null || s===undefined) ? null : (String(s).trim() || null);
   const exs = (session.exercises||[]).map(ex=>({
     name: normKey(ex.name),
     cardio: !!ex.cardio,
     sets: (ex.sets||[]).map(st=>({
-      weight: (st.weight===null || st.weight===undefined) ? null : st.weight,
-      reps: st.reps || null,
-      raw_weight: st.raw_weight || null
+      weight: normWeight(st.weight),
+      reps: normStr(st.reps),
+      raw_weight: normStr(st.raw_weight)
     }))
-  }));
-  return JSON.stringify({date: session.date, treino: session.treino, exercises: exs});
+  })).sort((a,b)=> a.name.localeCompare(b.name));
+  return JSON.stringify({
+    date: normStr(session.date),
+    treino: normStr(session.treino) ? normStr(session.treino).toUpperCase() : null,
+    exercises: exs
+  });
+}
+
+// Contagem de "peso" de um treino (nº de exercícios + nº de sets), para ao encontrar
+// duplicados sabermos qual é o mais completo e mantê-lo (em vez de escolher ao acaso).
+function sessionCompleteness(session){
+  const exs = session.exercises || [];
+  let sets = 0;
+  exs.forEach(ex=> sets += (ex.sets||[]).length);
+  return exs.length * 1000 + sets;
+}
+
+// Verificação mais alargada, para correr manualmente: agrupa por data + treino
+// (ignorando diferenças nos exercícios) — no uso normal da app, nunca devias ter dois
+// treinos do mesmo tipo no mesmo dia, por isso isto apanha duplicados que a verificação
+// automática (mais rigorosa, por conteúdo exato) possa ter deixado passar.
+function findLooseDuplicateGroups(){
+  const groups = {};
+  extraSessions.forEach(s=>{
+    if(!s._fsId || !s.date) return;
+    const key = (s.date||'').trim() + '_' + (s.treino||'').trim().toUpperCase();
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(s);
+  });
+  return Object.values(groups).filter(g=> g.length > 1);
 }
 
 // Gera um ID estável a partir do conteúdo do treino, para que gravar (ou migrar) o
@@ -741,22 +777,20 @@ function stableSessionId(session){
   return (session.date||'sem-data') + '_' + (session.treino||'X') + '_' + simpleHash(normalizeSessionForHash(session));
 }
 
-// Verifica todos os treinos já sincronizados e apaga duplicados (mesmo conteúdo,
-// documentos diferentes) — pode acontecer com dados mais antigos, de antes desta
-// verificação existir. Mantém sempre um exemplar de cada.
+// Verifica todos os treinos já sincronizados e apaga duplicados automaticamente,
+// sem pedir confirmação — corre sozinha sempre que a app sincroniza com o servidor.
+// Agrupa por data + treino (o mesmo tipo de treino no mesmo dia é sempre um duplicado,
+// no uso normal da app) e mantém sempre o registo mais completo de cada grupo
+// (mais exercícios/sets), apagando os restantes.
 let dedupeInFlight = false;
 function dedupeExistingSessions(){
   if(dedupeInFlight || !DB_REF) return;
-  const seen = {};
+  const groups = findLooseDuplicateGroups();
+  if(!groups.length) return;
   const toDelete = [];
-  extraSessions.forEach(s=>{
-    if(!s._fsId) return;
-    const key = normalizeSessionForHash(s);
-    if(seen[key]){
-      toDelete.push(s._fsId);
-    } else {
-      seen[key] = true;
-    }
+  groups.forEach(g=>{
+    const sorted = g.slice().sort((a,b)=> sessionCompleteness(b) - sessionCompleteness(a));
+    sorted.slice(1).forEach(s=> s._fsId && toDelete.push(s._fsId));
   });
   if(!toDelete.length) return;
   dedupeInFlight = true;
