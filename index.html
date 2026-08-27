@@ -252,26 +252,28 @@
     .sets-table thead{display:none;}
     .sets-table tr{
       display:grid;
-      grid-template-columns:26px 1fr auto;
+      grid-template-columns:26px 1fr;
       grid-template-areas:
-        "num weight weight"
-        "num reps confirm";
-      column-gap:8px; row-gap:8px; align-items:center;
+        "num weight"
+        "num reps"
+        "num actions";
+      column-gap:8px; row-gap:9px; align-items:center;
       background:var(--panel); border:1px solid var(--border); border-radius:12px;
-      padding:10px 12px; margin-bottom:10px;
+      padding:10px 12px 12px; margin-bottom:10px;
     }
     .sets-table td{padding:0;}
     .sets-table td:nth-child(1){grid-area:num; text-align:center; font-weight:700; color:var(--muted); font-size:13px; align-self:start;}
     .sets-table td:nth-child(2){grid-area:weight;}
     .sets-table td:nth-child(3){grid-area:reps;}
-    .sets-table td:nth-child(4){grid-area:confirm;}
+    .sets-table td:nth-child(4){grid-area:actions;}
     .set-weight-wrap, .set-reps-wrap{width:100%;}
     .set-weight-wrap::before{content:'Peso:'; font-size:11px; font-weight:700; color:var(--muted); flex:none; margin-right:2px;}
     .set-reps-wrap::before{content:'Reps:'; font-size:11px; font-weight:700; color:var(--muted); flex:none; margin-right:2px;}
     .set-weight, .set-reps{max-width:none; flex:1; min-width:0; font-size:16px; padding:11px 8px;}
     .qa-btn{width:36px; height:36px; font-size:17px;}
-    .set-confirm-btn{width:36px; height:36px; font-size:16px;}
-    .set-remove-btn{width:36px; height:36px; font-size:16px;}
+    .set-confirm-btn{width:40px; height:36px; font-size:16px;}
+    .set-remove-btn{width:40px; height:36px; font-size:16px;}
+    .set-actions{justify-content:flex-end; padding-top:2px; border-top:1px dashed var(--border);}
     .reorder-btn{width:34px; height:30px; font-size:14px;}
     .row-actions .btn.small{flex:1; min-width:0;}
     #exerciseFormArea.focus-mode .exercise-block.focus-active{padding:16px;}
@@ -700,6 +702,9 @@ function startFirestoreSync(){
     renderProgress();
     renderHome();
     if(document.getElementById('view-historico').classList.contains('active')) renderHistory();
+    // Sempre que os dados vêm confirmados do servidor (não da cache), aproveita para
+    // verificar e limpar duplicados automaticamente.
+    if(!snap.metadata.fromCache) dedupeExistingSessions();
   }, err=>{
     console.error('Firestore sync error', err);
     setSyncStatus('erro de sincronização', true);
@@ -707,17 +712,63 @@ function startFirestoreSync(){
   });
 }
 
-// Gera um ID estável a partir do conteúdo do treino (data + treino + exercícios), para que,
-// se dois dispositivos tentarem migrar/gravar o mesmo treino ao mesmo tempo, acabem sempre
-// a escrever no mesmo documento em vez de criarem duplicados.
 function simpleHash(str){
   let h = 0;
   for(let i=0;i<str.length;i++){ h = (Math.imul(31, h) + str.charCodeAt(i)) | 0; }
   return (h>>>0).toString(36);
 }
+
+// Assinatura "de conteúdo" de um treino: ignora campos incidentais (músculo, se teve
+// aquecimento, sets planeados, etc.) e olha só ao que realmente define um treino como
+// sendo o mesmo — data, tipo de treino, exercícios, e peso/reps de cada set.
+function normalizeSessionForHash(session){
+  const exs = (session.exercises||[]).map(ex=>({
+    name: normKey(ex.name),
+    cardio: !!ex.cardio,
+    sets: (ex.sets||[]).map(st=>({
+      weight: (st.weight===null || st.weight===undefined) ? null : st.weight,
+      reps: st.reps || null,
+      raw_weight: st.raw_weight || null
+    }))
+  }));
+  return JSON.stringify({date: session.date, treino: session.treino, exercises: exs});
+}
+
+// Gera um ID estável a partir do conteúdo do treino, para que gravar (ou migrar) o
+// mesmo treino mais que uma vez — no mesmo dispositivo ou em dispositivos diferentes —
+// escreva sempre no mesmo documento em vez de criar duplicados.
 function stableSessionId(session){
-  const base = JSON.stringify({date: session.date, treino: session.treino, exercises: session.exercises});
-  return (session.date||'sem-data') + '_' + (session.treino||'X') + '_' + simpleHash(base);
+  return (session.date||'sem-data') + '_' + (session.treino||'X') + '_' + simpleHash(normalizeSessionForHash(session));
+}
+
+// Verifica todos os treinos já sincronizados e apaga duplicados (mesmo conteúdo,
+// documentos diferentes) — pode acontecer com dados mais antigos, de antes desta
+// verificação existir. Mantém sempre um exemplar de cada.
+let dedupeInFlight = false;
+function dedupeExistingSessions(){
+  if(dedupeInFlight || !DB_REF) return;
+  const seen = {};
+  const toDelete = [];
+  extraSessions.forEach(s=>{
+    if(!s._fsId) return;
+    const key = normalizeSessionForHash(s);
+    if(seen[key]){
+      toDelete.push(s._fsId);
+    } else {
+      seen[key] = true;
+    }
+  });
+  if(!toDelete.length) return;
+  dedupeInFlight = true;
+  const batch = DB_REF.batch();
+  toDelete.forEach(id=> batch.delete(SESSIONS_COL.doc(id)));
+  batch.commit().then(()=>{
+    showToast(`🧹 Removidos ${toDelete.length} treino(s) duplicado(s).`);
+  }).catch(err=>{
+    console.error('Erro ao remover duplicados', err);
+  }).finally(()=>{
+    dedupeInFlight = false;
+  });
 }
 
 // Migração única (e segura de repetir) do antigo documento único 'ginasio/treinos_extra'
