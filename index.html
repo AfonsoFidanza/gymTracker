@@ -743,7 +743,12 @@ function startFirestoreSync(){
     scheduleFullRerender();
     // Sempre que os dados vêm confirmados do servidor (não da cache), aproveita para
     // verificar e limpar duplicados automaticamente.
-    if(!snap.metadata.fromCache){ dedupeExistingSessions(); maybeMigrateExerciseNames(); }
+    if(!snap.metadata.fromCache){
+      try{ dedupeExistingSessions(); }catch(e){ console.error('Erro nos duplicados', e); }
+    }
+    // Corre em qualquer snapshot (cache ou servidor): com a cache local ligada, o Firestore
+    // muitas vezes só emite o primeiro evento (fromCache=true) e nunca um segundo.
+    try{ maybeMigrateExerciseNames(); }catch(e){ console.error('Erro na migração de nomes', e); }
   }, err=>{
     console.error('Firestore sync error', err);
     setSyncStatus('erro de sincronização', true);
