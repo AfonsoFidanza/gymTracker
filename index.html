@@ -29,7 +29,8 @@
     --nav-w:224px; --head-h:60px; --bar-h:64px;
   }
   *{box-sizing:border-box;}
-  html{-webkit-text-size-adjust:100%;}
+  html{-webkit-text-size-adjust:100%; overscroll-behavior:none;}
+  body{padding-top:calc(var(--head-h) + env(safe-area-inset-top)); overscroll-behavior:none;}
   body{
     margin:0; font:400 15px/1.45 var(--font); background:var(--bg); color:var(--text);
     -webkit-font-smoothing:antialiased; -webkit-tap-highlight-color:transparent;
@@ -41,8 +42,9 @@
   /* ===== Cabeçalho ===== */
   header{
     display:flex; align-items:center; justify-content:space-between; gap:12px;
-    height:var(--head-h); padding:0 24px; background:var(--panel); border-bottom:1px solid var(--border);
-    position:sticky; top:0; z-index:30;
+    height:var(--head-h); padding-left:24px; padding-right:24px; background:var(--panel); border-bottom:1px solid var(--border);
+    position:fixed; top:0; left:0; right:0; z-index:60;
+    padding-top:env(safe-area-inset-top); box-sizing:content-box;
   }
   .brand{display:flex; align-items:center; gap:12px; min-width:0;}
   .logo{display:flex; align-items:flex-end; gap:3px; height:26px; flex:none;}
@@ -78,7 +80,7 @@
 
   /* ===== Navegação (barra lateral no ecrã grande) ===== */
   nav{
-    position:fixed; left:0; top:var(--head-h); bottom:0; width:var(--nav-w); padding:16px 12px;
+    position:fixed; left:0; top:calc(var(--head-h) + env(safe-area-inset-top)); bottom:0; width:var(--nav-w); padding:16px 12px;
     background:var(--panel); border-right:1px solid var(--border);
     display:flex; flex-direction:column; gap:2px; overflow-y:auto; z-index:25;
   }
@@ -372,7 +374,7 @@
   /* ===== Telemóvel e ecrãs pequenos ===== */
   @media (max-width: 899px){
     :root{--head-h:56px;}
-    header{padding:0 14px;}
+    header{padding-left:14px; padding-right:14px;}
     header h1{font-size:19px;}
     header .sub{display:none;}
     .btn.menu-btn{display:inline-flex; width:44px; padding:0; font-size:20px;}
@@ -465,8 +467,8 @@
     .cal-page-day{font-size:15px; border-radius:9px;}
     .body-section{padding:14px;}
 
-    .edit-overlay{align-items:flex-end; padding:0;}
-    .edit-modal{max-width:none; border-radius:20px 20px 0 0; max-height:94vh; max-height:94dvh;}
+    .edit-overlay{align-items:flex-end; padding:0 8px calc(8px + env(safe-area-inset-bottom));}
+    .edit-modal{max-width:none; border-radius:36px; max-height:94vh; max-height:94dvh;}
     .edit-body{padding:14px;}
   }
   @media (max-width: 899px){
@@ -592,7 +594,7 @@
   @media (max-width: 899px){
     /* Ecrãs "fixos": ocupam exatamente o espaço entre o cabeçalho e a barra inferior; a página nunca faz scroll */
     #view-adicionar.active, #view-calendario.active{
-      position:fixed; top:var(--head-h); bottom:calc(var(--bar-h) + env(safe-area-inset-bottom)); left:0; right:0;
+      position:fixed; top:calc(var(--head-h) + env(safe-area-inset-top)); bottom:calc(var(--bar-h) + env(safe-area-inset-bottom)); left:0; right:0;
       height:auto; margin:0; padding:10px 14px; overflow:hidden; z-index:1;
     }
     #exerciseFormArea .exercise-block > .sets-table{display:block; height:100%; max-height:none; min-height:252px; table-layout:auto;}
@@ -650,7 +652,7 @@
   .home-grid-shortcuts .home-shortcuts{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr));}
   .home-clamp{display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;}
   @media (max-width:899px){
-    #view-inicio.active{position:fixed; top:var(--head-h); bottom:calc(var(--bar-h) + env(safe-area-inset-bottom)); left:0; right:0; padding:10px 14px; overflow:hidden; display:flex; flex-direction:column; gap:10px; z-index:1;}
+    #view-inicio.active{position:fixed; top:calc(var(--head-h) + env(safe-area-inset-top)); bottom:calc(var(--bar-h) + env(safe-area-inset-bottom)); left:0; right:0; padding:10px 14px; overflow:hidden; display:flex; flex-direction:column; gap:10px; z-index:1;}
     #view-inicio .home-week-card{margin:0; padding:12px;}
     #view-inicio .home-week-header{margin-bottom:8px;}
     #view-inicio .home-week-header h2{font-size:20px;}
