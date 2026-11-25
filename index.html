@@ -699,9 +699,15 @@
   .help-sec p{margin:0 0 6px; font-size:14px; line-height:1.5; text-align:justify; hyphens:auto; color:var(--text);}
 
   /* sem zoom: bloqueia duplo toque e pinça; campos a 16px evitam o zoom automático do iOS ao focar */
-  html,body{touch-action:manipulation; -webkit-text-size-adjust:100%;}
+  html,body,body *{touch-action:pan-x pan-y;}
+  html,body{ -webkit-text-size-adjust:100%;}
   input,select,textarea{font-size:16px !important;}
 </style>
+<script>
+['gesturestart','gesturechange','gestureend'].forEach(function(e){document.addEventListener(e,function(ev){ev.preventDefault();},{passive:false});});
+document.addEventListener('touchmove',function(ev){if(ev.touches&&ev.touches.length>1)ev.preventDefault();},{passive:false});
+document.addEventListener('touchend',function(ev){var n=Date.now();if(window.__lt&&n-window.__lt<350)ev.preventDefault();window.__lt=n;},{passive:false});
+</script>
 </head>
 <body>
 
