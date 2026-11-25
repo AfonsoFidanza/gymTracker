@@ -684,6 +684,19 @@
     #exerciseFormArea .ex-header .warmup-toggle{grid-row:auto; grid-column:auto; margin:0 6px 0 auto; min-height:32px; padding:0 8px; font-size:12px; margin-bottom:0;}
     #exerciseFormArea .exercise-block > .aperture-field{grid-column:1 / -1;}
   }
+  .login-hint{font-size:12px; color:var(--muted); margin:6px 2px 0; line-height:1.4;}
+  .login-link{background:none; border:0; color:var(--muted); font:500 13px var(--font); text-decoration:underline; cursor:pointer; margin:10px auto 0; display:block; min-height:36px;}
+  .ex-remove-btn{color:var(--bad); align-self:flex-start; width:36px; height:32px; margin-left:6px; flex:none;}
+  .ex-remove-btn:hover{border-color:var(--bad); background:var(--bad-bg);}
+  @media (max-width:899px){
+    #exerciseFormArea .ex-remove-btn{width:30px; height:24px; margin-left:4px;}
+    #exerciseFormArea .reorder-btn{width:30px;}
+    #exerciseFormArea .ex-header-main h4{font-size:17px;}
+    #exerciseFormArea .ex-header .warmup-toggle{margin-right:4px;}
+  }
+  .help-sec{margin-bottom:16px;}
+  .help-sec h3{margin:0 0 6px; font-size:19px;}
+  .help-sec p{margin:0 0 6px; font-size:14px; line-height:1.5; text-align:justify; hyphens:auto; color:var(--text);}
 </style>
 </head>
 <body>
@@ -691,11 +704,15 @@
 <div id="loginOverlay" class="login-overlay">
   <div class="login-box">
     <div class="login-brand"><span class="logo"><i></i><i></i><i></i></span><h2>Progresso do Ginásio</h2></div>
-    <p class="login-sub">Entra para veres e sincronizares os teus treinos entre dispositivos.</p>
+    <p class="login-sub">Entra, cria conta ou usa sem conta. Cada pessoa vê só os seus treinos.</p>
     <div class="field"><label>Email</label><input type="email" id="loginEmail" autocomplete="username"></div>
     <div class="field"><label>Password</label><input type="password" id="loginPassword" autocomplete="current-password"></div>
     <div class="login-error" id="loginError"></div>
     <button class="btn primary" id="loginBtn" style="width:100%; margin-top:6px;">Entrar</button>
+    <button class="btn" id="registerBtn" style="width:100%; margin-top:8px;">Criar conta</button>
+    <button class="btn" id="guestBtn" style="width:100%; margin-top:8px;">Usar sem conta (neste dispositivo)</button>
+    <p class="login-hint">Sem conta: os treinos ficam guardados no histórico deste browser, sem internet e sem sincronizar com outros dispositivos. Se limpares os dados do browser perdem-se: usa "Exportar" de vez em quando.</p>
+    <button type="button" class="login-link" id="resetPassBtn">Esqueci a password</button>
     <div class="login-guides">
       <p class="login-guides-label">Guias descarregáveis</p>
       <a class="login-guide-link" id="guideAppLink" download="guia-como-usar-a-app.pdf" href="#">Como usar a app (PDF)</a>
@@ -718,8 +735,11 @@
     <button class="btn menu-btn" id="menuBtn" type="button" aria-label="Mais opções">⋯</button>
     <div class="header-actions">
       <button class="btn small" id="exportBtn">Exportar (.csv)</button>
-      <button class="btn small" id="importBtn">Importar (.csv)</button>
-      <input type="file" id="importFileInput" accept=".csv" style="display:none;">
+      <button class="btn small" id="importBtn">Importar (.xlsx / .csv)</button>
+      <button class="btn small" id="templateBtn" type="button">Modelo Excel</button>
+      <button class="btn small" id="helpBtn" type="button">Ajuda</button>
+      <input type="file" id="importFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
+      <button class="btn small" id="guestUpgradeBtn" type="button" style="display:none;" onclick="upgradeGuest()">Criar conta</button>
       <button class="btn small danger" id="logoutBtn">Sair</button>
     </div>
   </div>
@@ -956,12 +976,18 @@
 </div>
 <div class="toast" id="toast"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <script>
 const RAW_DATA = {"plan": {"A": [{"muscle": "Peito", "exercise": "supino", "sets": 3, "reps": "8-12"}, {"muscle": "Peito", "exercise": "peito máquina", "sets": 3, "reps": "8-12"}, {"muscle": "Peito", "exercise": "peito máquina (upper)", "sets": 3, "reps": "8-12"}, {"muscle": "Peito", "exercise": "peito abre e fecha", "sets": 3, "reps": "8-12"}, {"muscle": "Tricep", "exercise": "tricep corda", "sets": 4, "reps": "8-12"}, {"muscle": "Tricep", "exercise": "tricep barra", "sets": 4, "reps": "8-12"}], "B": [{"muscle": "Costas", "exercise": "puxar barra", "sets": 4, "reps": "10-12"}, {"muscle": "Costas", "exercise": "remada", "sets": 4, "reps": "10-12"}, {"muscle": "Bicep", "exercise": "hammer curl", "sets": 4, "reps": "10-12"}], "C": [{"muscle": "Pernas", "exercise": "deadlift", "sets": 4, "reps": "10-12"}, {"muscle": "Pernas", "exercise": "hack squat", "sets": 4, "reps": "10-12"}, {"muscle": "Ombros", "exercise": "overhead press", "sets": 3, "reps": "08-10"}, {"muscle": "Ombros", "exercise": "dumbell OHP (sentado)", "sets": 3, "reps": "08-10"}]}, "muscle_to_treino": {"peito": "A", "tricep": "A", "costas": "B", "bicep": "B", "pernas": "C", "ombros": "C"}, "sessions": [{"num": 1, "date": "2026-04-27", "weekday": "2ªfeira", "treino": "A", "treino_raw": "A", "exercises": [{"muscle": "peito", "name": "supino", "name_key": "supino", "planned_sets": 3, "treino": "A", "sets": [{"weight": 10.0, "reps": "10", "note": null, "raw_weight": "10kg"}, {"weight": 15.0, "reps": "10", "note": null, "raw_weight": "15kg"}, {"weight": 25.0, "reps": "10", "note": null, "raw_weight": "25kg"}]}, {"muscle": "peito", "name": "peito máquina", "name_key": "peito maquina", "planned_sets": 3, "treino": "A", "sets": [{"weight": 10.0, "reps": "8", "note": null, "raw_weight": "10kg"}, {"weight": 5.0, "reps": "8", "note": null, "raw_weight": "5kg"}, {"weight": 5.0, "reps": "8", "note": null, "raw_weight": "5kg"}]}, {"muscle": "peito", "name": "peito maquina superior", "name_key": "peito maquina superior", "planned_sets": 3, "treino": "A", "sets": [{"weight": 5.0, "reps": "5-8", "note": null, "raw_weight": "5kg"}, {"weight": 0.0, "reps": "5-8", "note": null, "raw_weight": "0kg"}, {"weight": 0.0, "reps": "5-8", "note": null, "raw_weight": "0kg"}]}, {"muscle": "peito", "name": "peito abre e fecha", "name_key": "peito abre e fecha", "planned_sets": 3, "treino": "A", "sets": [{"weight": 10.0, "reps": "10-12", "note": null, "raw_weight": "10kg"}, {"weight": 20.0, "reps": "10-12", "note": null, "raw_weight": "20kg"}, {"weight": 25.0, "reps": "10-12", "note": null, "raw_weight": "25kg"}]}, {"muscle": "tricep", "name": "tricep corda", "name_key": "tricep corda", "planned_sets": 3, "treino": "A", "sets": [{"weight": 10.0, "reps": "6-8", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "6-8", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "6-8", "note": null, "raw_weight": "10kg"}]}, {"muscle": "tricep", "name": "tricep barra", "name_key": "tricep barra", "planned_sets": 3, "treino": "A", "sets": [{"weight": 10.0, "reps": "8-10", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "8-10", "note": null, "raw_weight": "10kg"}, {"weight": 15.0, "reps": "8-10", "note": null, "raw_weight": "15kg"}]}]}, {"num": 2, "date": "2026-04-28", "weekday": "3ªfeira", "treino": "B", "treino_raw": "costas / perna", "exercises": [{"muscle": "costas", "name": "puxar barra", "name_key": "puxar barra", "planned_sets": 4, "treino": "B", "sets": [{"weight": 59.0, "reps": "12", "note": null, "raw_weight": "59kg"}, {"weight": 39.0, "reps": "12", "note": null, "raw_weight": "39kg"}, {"weight": 39.0, "reps": "12", "note": null, "raw_weight": "39kg"}, {"weight": 39.0, "reps": "12", "note": null, "raw_weight": "39kg"}]}, {"muscle": "pernas", "name": "deadlift", "name_key": "deadlift", "planned_sets": 4, "treino": "C", "sets": [{"weight": 30.0, "reps": "12", "note": null, "raw_weight": "30kg"}, {"weight": 30.0, "reps": "12", "note": null, "raw_weight": "30kg"}, {"weight": 30.0, "reps": "12", "note": null, "raw_weight": "30kg"}, {"weight": 30.0, "reps": "12", "note": null, "raw_weight": "30kg"}]}, {"muscle": "costas", "name": "puxar barra", "name_key": "puxar barra", "planned_sets": 4, "treino": "B", "sets": [{"weight": 39.0, "reps": "12", "note": null, "raw_weight": "39kg"}, {"weight": 39.0, "reps": "12", "note": null, "raw_weight": "39kg"}, {"weight": 39.0, "reps": "12", "note": null, "raw_weight": "39kg"}, {"weight": 39.0, "reps": "12", "note": null, "raw_weight": "39kg"}]}]}, {"num": 3, "date": "2026-04-30", "weekday": "5ªfeira", "treino": "A", "treino_raw": "A", "exercises": [{"muscle": "peito", "name": "halteres peito", "name_key": "halteres peito", "planned_sets": 4, "treino": "A", "sets": [{"weight": 10.0, "reps": "10-12", "note": null, "raw_weight": "10kg"}, {"weight": 12.5, "reps": "10-12", "note": null, "raw_weight": "12,5kg"}, {"weight": 15.0, "reps": "10-12", "note": null, "raw_weight": "15kg"}, {"weight": 17.5, "reps": "10-12", "note": null, "raw_weight": "17,5kg"}]}, {"muscle": "peito", "name": "peito máquina", "name_key": "peito maquina", "planned_sets": 4, "treino": "A", "sets": [{"weight": 5.0, "reps": "8", "note": null, "raw_weight": "5kg"}, {"weight": 2.5, "reps": "8", "note": null, "raw_weight": "2,5kg"}, {"weight": 2.5, "reps": "8", "note": null, "raw_weight": "2,5kg"}, {"weight": 2.5, "reps": "8", "note": null, "raw_weight": "2,5kg"}]}, {"muscle": "peito", "name": "peito abre e fecha", "name_key": "peito abre e fecha", "planned_sets": 3, "treino": "A", "sets": [{"weight": 35.0, "reps": "8-12", "note": null, "raw_weight": "35kg"}, {"weight": 45.0, "reps": "8-12", "note": null, "raw_weight": "45kg"}, {"weight": 45.0, "reps": "8-12", "note": null, "raw_weight": "45kg"}, {"weight": null, "reps": "8-12", "note": null, "raw_weight": "N/A"}]}, {"muscle": "tricep", "name": "elevações tricep", "name_key": "elevacoes tricep", "planned_sets": 3, "treino": "A", "sets": [{"weight": 50.0, "reps": "4-6", "note": "assistido", "raw_weight": "50kg(ajuda)"}, {"weight": 50.0, "reps": "4-6", "note": "assistido", "raw_weight": "50kg(ajuda)"}, {"weight": 50.0, "reps": "4-6", "note": "assistido", "raw_weight": "50kg(ajuda)"}, {"weight": null, "reps": "4-6", "note": null, "raw_weight": "N/A"}]}, {"muscle": "tricep", "name": "tricep barra (skull crushers)", "name_key": "tricep barra (skull crushers)", "planned_sets": 4, "treino": "A", "sets": [{"weight": 0.0, "reps": "8-12", "note": null, "raw_weight": "0kg"}, {"weight": 2.5, "reps": "8-12", "note": null, "raw_weight": "2,5kg"}, {"weight": 2.5, "reps": "8-12", "note": null, "raw_weight": "2,5kg"}, {"weight": 0.0, "reps": "8-12", "note": null, "raw_weight": "0kg"}]}, {"muscle": "tricep", "name": "tricep corda", "name_key": "tricep corda", "planned_sets": 3, "treino": "A", "sets": [{"weight": 0.0, "reps": "8-10", "note": null, "raw_weight": "0kg"}, {"weight": 0.0, "reps": "8-10", "note": null, "raw_weight": "0kg"}, {"weight": 0.0, "reps": "8-10", "note": null, "raw_weight": "0kg"}, {"weight": 0.0, "reps": "8-10", "note": null, "raw_weight": "0kg"}]}]}, {"num": 4, "date": "2026-05-04", "weekday": "2ª feira", "treino": "B", "treino_raw": "costas / perna", "exercises": [{"muscle": "costas", "name": "puxar barra", "name_key": "puxar barra", "planned_sets": 4, "treino": "B", "sets": [{"weight": 39.0, "reps": "8-12", "note": null, "raw_weight": "39kg"}, {"weight": 45.5, "reps": "8-12", "note": null, "raw_weight": "45,5kg"}, {"weight": 52.0, "reps": "8-12", "note": null, "raw_weight": "52kg"}, {"weight": 52.0, "reps": "8-12", "note": null, "raw_weight": "52kg"}]}, {"muscle": "pernas", "name": "deadlift", "name_key": "deadlift", "planned_sets": 4, "treino": "C", "sets": [{"weight": 30.0, "reps": "12", "note": null, "raw_weight": "30kg"}, {"weight": 50.0, "reps": "12", "note": null, "raw_weight": "50kg"}, {"weight": 50.0, "reps": "12", "note": null, "raw_weight": "50kg"}, {"weight": 50.0, "reps": "12", "note": null, "raw_weight": "50kg"}]}, {"muscle": "costas", "name": "puxar barra", "name_key": "puxar barra", "planned_sets": 4, "treino": "B", "sets": [{"weight": 45.5, "reps": "12", "note": null, "raw_weight": "45,5kg"}, {"weight": 45.5, "reps": "12", "note": null, "raw_weight": "45,5kg"}, {"weight": 45.5, "reps": "12", "note": null, "raw_weight": "45,5kg"}, {"weight": 45.5, "reps": "12", "note": null, "raw_weight": "45,5kg"}]}]}, {"num": 5, "date": "2026-05-05", "weekday": "3ªfeira", "treino": "A", "treino_raw": "A", "exercises": [{"muscle": "peito", "name": "halteres peito", "name_key": "halteres peito", "planned_sets": 4, "treino": "A", "sets": [{"weight": 12.5, "reps": "12", "note": null, "raw_weight": "12,5kg"}, {"weight": 15.0, "reps": "12", "note": null, "raw_weight": "15kg"}, {"weight": 17.5, "reps": "9", "note": null, "raw_weight": "17,5kg"}, {"weight": 17.5, "reps": "8", "note": null, "raw_weight": "17.5"}]}, {"muscle": "peito", "name": "peito maquina superior", "name_key": "peito maquina superior", "planned_sets": 4, "treino": "A", "sets": [{"weight": 2.5, "reps": "12", "note": null, "raw_weight": "2,5kg"}, {"weight": 5.0, "reps": "12", "note": null, "raw_weight": "5kg"}, {"weight": 7.5, "reps": "12", "note": null, "raw_weight": "7,5kg"}, {"weight": 10.0, "reps": "9", "note": null, "raw_weight": "10kg"}]}, {"muscle": "peito", "name": "peito abre e fecha", "name_key": "peito abre e fecha", "planned_sets": 4, "treino": "A", "sets": [{"weight": 40.0, "reps": "12", "note": null, "raw_weight": "40kg"}, {"weight": 50.0, "reps": "9", "note": null, "raw_weight": "50kg"}, {"weight": 50.0, "reps": "8", "note": null, "raw_weight": "50kg"}, {"weight": 50.0, "reps": "6", "note": null, "raw_weight": "50kg"}]}, {"muscle": "tricep", "name": "tricep barra roldana", "name_key": "tricep barra roldana", "planned_sets": 3, "treino": "A", "sets": [{"weight": 30.0, "reps": "12", "note": null, "raw_weight": "30kg"}, {"weight": 35.0, "reps": "12", "note": null, "raw_weight": "35kg"}, {"weight": 40.0, "reps": "6", "note": null, "raw_weight": "40kg"}]}, {"muscle": "tricep", "name": "tricep corda roldana", "name_key": "tricep corda roldana", "planned_sets": 3, "treino": "A", "sets": [{"weight": 20.0, "reps": "8", "note": null, "raw_weight": "20kg"}, {"weight": 15.0, "reps": "12", "note": null, "raw_weight": "15kg"}, {"weight": 15.0, "reps": "20", "note": null, "raw_weight": "15kg"}]}]}, {"num": 6, "date": "2026-05-06", "weekday": "4ªfeira", "treino": "B", "treino_raw": "B", "exercises": [{"muscle": "costas", "name": "puxar barra", "name_key": "puxar barra", "planned_sets": 4, "treino": "B", "sets": [{"weight": 32.5, "reps": "12", "note": null, "raw_weight": "32,5kg"}, {"weight": 45.5, "reps": "12", "note": null, "raw_weight": "45,5kg"}, {"weight": 52.0, "reps": "12", "note": null, "raw_weight": "52kg"}, {"weight": 52.0, "reps": "10", "note": null, "raw_weight": "52kg"}]}, {"muscle": "costas", "name": "remada", "name_key": "remada", "planned_sets": 4, "treino": "B", "sets": [{"weight": 35.0, "reps": "12", "note": null, "raw_weight": "35kg"}, {"weight": 45.0, "reps": "12", "note": null, "raw_weight": "45kg"}, {"weight": 45.0, "reps": "12", "note": null, "raw_weight": "45kg"}, {"weight": 45.0, "reps": "10", "note": null, "raw_weight": "45kg"}]}, {"muscle": "costas", "name": "puxar maquina (barriga inclinada)", "name_key": "puxar maquina (barriga inclinada)", "planned_sets": 4, "treino": "B", "sets": [{"weight": 10.0, "reps": "13", "note": null, "raw_weight": "10kg"}, {"weight": 20.0, "reps": "12", "note": null, "raw_weight": "20kg"}, {"weight": 25.0, "reps": "7", "note": null, "raw_weight": "25kg"}, {"weight": 20.0, "reps": "10", "note": null, "raw_weight": "20kg"}]}, {"muscle": "bicep", "name": "curl maquina", "name_key": "curl maquina", "planned_sets": 3, "treino": "B", "sets": [{"weight": 10.0, "reps": "13", "note": null, "raw_weight": "10kg"}, {"weight": 15.0, "reps": "10", "note": null, "raw_weight": "15kg"}, {"weight": 15.0, "reps": "6", "note": null, "raw_weight": "15kg"}]}, {"muscle": "bicep", "name": "hammer curl", "name_key": "hammer curl", "planned_sets": 3, "treino": "B", "sets": [{"weight": 10.0, "reps": "8", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "6", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "5", "note": null, "raw_weight": "10kg"}]}]}, {"num": 7, "date": "2026-05-07", "weekday": "5ªfeira", "treino": "C", "treino_raw": "C", "exercises": [{"muscle": "pernas", "name": "smith machine", "name_key": "smith machine", "planned_sets": 4, "treino": "C", "sets": [{"weight": 10.0, "reps": "12", "note": null, "raw_weight": "10kg"}, {"weight": 15.0, "reps": "10", "note": null, "raw_weight": "15kg"}, {"weight": 15.0, "reps": "10", "note": null, "raw_weight": "15kg"}, {"weight": 15.0, "reps": "10", "note": null, "raw_weight": "15kg"}]}, {"muscle": "pernas", "name": "leg press peso livre", "name_key": "leg press peso livre", "planned_sets": 4, "treino": "C", "sets": [{"weight": 15.0, "reps": "10", "note": null, "raw_weight": "15kg"}, {"weight": 15.0, "reps": "10", "note": null, "raw_weight": "15kg"}, {"weight": 15.0, "reps": "12", "note": null, "raw_weight": "15kg"}, {"weight": 20.0, "reps": "13", "note": null, "raw_weight": "20kg"}]}, {"muscle": "pernas", "name": "seated leg curl", "name_key": "seated leg curl", "planned_sets": 4, "treino": "C", "sets": [{"weight": 20.0, "reps": "12", "note": null, "raw_weight": "20kg"}, {"weight": 30.0, "reps": "12", "note": null, "raw_weight": "30kg"}, {"weight": 40.0, "reps": "12", "note": null, "raw_weight": "40kg"}, {"weight": 50.0, "reps": "14", "note": null, "raw_weight": "50kg"}]}]}, {"num": 8, "date": "2026-05-08", "weekday": "6ª feira", "treino": "A", "treino_raw": "A", "exercises": [{"muscle": "peito", "name": "supino", "name_key": "supino", "planned_sets": 4, "treino": "A", "sets": [{"weight": 10.0, "reps": "12", "note": null, "raw_weight": "10kg"}, {"weight": 12.5, "reps": "12", "note": null, "raw_weight": "12,5kg"}, {"weight": 12.5, "reps": "8", "note": null, "raw_weight": "12,5kg"}, {"weight": 10.0, "reps": "12", "note": null, "raw_weight": "10kg"}]}, {"muscle": "peito", "name": "peito máquina", "name_key": "peito maquina", "planned_sets": 3, "treino": "A", "sets": [{"weight": 5.0, "reps": "12", "note": null, "raw_weight": "5kg"}, {"weight": 7.5, "reps": "8", "note": null, "raw_weight": "7,5kg"}, {"weight": 7.5, "reps": "7", "note": null, "raw_weight": "7,5kg"}]}, {"muscle": "peito", "name": "peito abre e fecha", "name_key": "peito abre e fecha", "planned_sets": 3, "treino": "A", "sets": [{"weight": 45.0, "reps": "10", "note": null, "raw_weight": "45kg"}, {"weight": 45.0, "reps": "9", "note": null, "raw_weight": "45kg"}, {"weight": 45.0, "reps": "9", "note": null, "raw_weight": "45kg"}]}, {"muscle": "tricep", "name": "elevações tricep", "name_key": "elevacoes tricep", "planned_sets": 3, "treino": "A", "sets": [{"weight": 55.0, "reps": "8", "note": "assistido", "raw_weight": "55kg(ajuda)"}, {"weight": 55.0, "reps": "6", "note": "assistido", "raw_weight": "55kg(ajuda)"}, {"weight": 60.0, "reps": "6", "note": "assistido", "raw_weight": "60kg(ajuda)"}]}, {"muscle": "tricep", "name": "tricep corda", "name_key": "tricep corda", "planned_sets": 3, "treino": "A", "sets": [{"weight": 15.0, "reps": "6", "note": null, "raw_weight": "15kg"}, {"weight": 15.0, "reps": "6", "note": null, "raw_weight": "15kg"}]}]}, {"num": 9, "date": "2026-05-13", "weekday": "4ªfeira", "treino": "A", "treino_raw": "A", "exercises": [{"muscle": "peito", "name": "peito abre e fecha", "name_key": "peito abre e fecha", "planned_sets": 4, "treino": "A", "sets": [{"weight": 45.0, "reps": "12", "note": null, "raw_weight": "45kg"}, {"weight": 50.0, "reps": "12", "note": null, "raw_weight": "50kg"}, {"weight": 55.0, "reps": "12", "note": null, "raw_weight": "55kg"}, {"weight": 55.0, "reps": "12", "note": null, "raw_weight": "55kg"}]}, {"muscle": "peito", "name": "peito máquina", "name_key": "peito maquina", "planned_sets": 4, "treino": "A", "sets": [{"weight": 5.0, "reps": "12", "note": null, "raw_weight": "5kg"}, {"weight": 7.5, "reps": "7", "note": null, "raw_weight": "7,5kg"}, {"weight": 5.0, "reps": "9", "note": null, "raw_weight": "5kg"}, {"weight": 5.0, "reps": "7", "note": null, "raw_weight": "5kg"}]}, {"muscle": "peito", "name": "peito maquina superior", "name_key": "peito maquina superior", "planned_sets": 4, "treino": "A", "sets": [{"weight": 2.5, "reps": "9", "note": null, "raw_weight": "2,5kg"}, {"weight": 2.5, "reps": "11", "note": null, "raw_weight": "2,5kg"}, {"weight": 2.5, "reps": "10", "note": null, "raw_weight": "2,5kg"}, {"weight": 2.5, "reps": "11", "note": null, "raw_weight": "2,5kg"}]}, {"muscle": "tricep", "name": "elevações tricep", "name_key": "elevacoes tricep", "planned_sets": 3, "treino": "A", "sets": [{"weight": 55.0, "reps": "12", "note": "assistido", "raw_weight": "55kg(ajuda)"}, {"weight": 50.0, "reps": "10", "note": "assistido", "raw_weight": "50kg(ajuda)"}, {"weight": 50.0, "reps": "8", "note": "assistido", "raw_weight": "50kg(ajuda)"}]}, {"muscle": "tricep", "name": "tricep corda", "name_key": "tricep corda", "planned_sets": 3, "treino": "A", "sets": [{"weight": 15.0, "reps": "9", "note": null, "raw_weight": "15kg"}, {"weight": 15.0, "reps": "8", "note": null, "raw_weight": "15kg"}, {"weight": 15.0, "reps": "7", "note": null, "raw_weight": "15kg"}, {"weight": 10.0, "reps": "15", "note": null, "raw_weight": "10kg"}]}]}, {"num": 10, "date": "2026-05-14", "weekday": "5ªfeira", "treino": "B", "treino_raw": "B", "exercises": [{"muscle": "costas", "name": "puxar barra", "name_key": "puxar barra", "planned_sets": 4, "treino": "B", "sets": [{"weight": 45.5, "reps": "12", "note": null, "raw_weight": "45,5kg"}, {"weight": 52.0, "reps": "12", "note": null, "raw_weight": "52kg"}, {"weight": 58.5, "reps": "11", "note": null, "raw_weight": "58,5kg"}, {"weight": 58.5, "reps": "8", "note": null, "raw_weight": "58,5kg"}]}, {"muscle": "costas", "name": "remada", "name_key": "remada", "planned_sets": 4, "treino": "B", "sets": [{"weight": 40.0, "reps": "12", "note": null, "raw_weight": "40kg"}, {"weight": 45.0, "reps": "12", "note": null, "raw_weight": "45kg"}, {"weight": 45.0, "reps": "12", "note": null, "raw_weight": "45kg"}, {"weight": 50.0, "reps": "11", "note": null, "raw_weight": "50kg"}]}, {"muscle": "costas", "name": "puxar maquina (barriga inclinada)", "name_key": "puxar maquina (barriga inclinada)", "planned_sets": 4, "treino": "B", "sets": [{"weight": 20.0, "reps": "12", "note": null, "raw_weight": "20kg"}, {"weight": 25.0, "reps": "11", "note": null, "raw_weight": "25kg"}, {"weight": 27.5, "reps": "10", "note": null, "raw_weight": "27,5kg"}, {"weight": 27.5, "reps": "9", "note": null, "raw_weight": "27,5kg"}]}, {"muscle": "bicep", "name": "hammer curl", "name_key": "hammer curl", "planned_sets": 4, "treino": "B", "sets": [{"weight": 7.5, "reps": "12", "note": null, "raw_weight": "7,5kg"}, {"weight": 10.0, "reps": "11", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "10", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "10", "note": null, "raw_weight": "10kg"}]}, {"muscle": "bicep", "name": "curl maquina", "name_key": "curl maquina", "planned_sets": 4, "treino": "B", "sets": [{"weight": 15.0, "reps": "8", "note": null, "raw_weight": "15kg"}, {"weight": 10.0, "reps": "10", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "9", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "9", "note": null, "raw_weight": "10kg"}]}]}, {"num": 11, "date": "2026-05-15", "weekday": "6ªfeira", "treino": "C", "treino_raw": "C", "exercises": [{"muscle": "pernas", "name": "smith machine", "name_key": "smith machine", "planned_sets": 4, "treino": "C", "sets": [{"weight": 5.0, "reps": "12", "note": null, "raw_weight": "5kg"}, {"weight": 15.0, "reps": "12", "note": null, "raw_weight": "15kg"}, {"weight": 20.0, "reps": "10", "note": null, "raw_weight": "20kg"}, {"weight": 20.0, "reps": "10", "note": null, "raw_weight": "20kg"}]}, {"muscle": "pernas", "name": "leg press peso livre", "name_key": "leg press peso livre", "planned_sets": 4, "treino": "C", "sets": [{"weight": 15.0, "reps": "12", "note": null, "raw_weight": "15kg"}, {"weight": 17.5, "reps": "12", "note": null, "raw_weight": "17,5kg"}, {"weight": 22.5, "reps": "12", "note": null, "raw_weight": "22,5kg"}, {"weight": 27.5, "reps": "12", "note": null, "raw_weight": "27,5kg"}]}, {"muscle": "pernas", "name": "seated leg curl", "name_key": "seated leg curl", "planned_sets": 4, "treino": "C", "sets": [{"weight": 35.0, "reps": "12", "note": null, "raw_weight": "35kg"}, {"weight": 55.0, "reps": "12", "note": null, "raw_weight": "55kg"}, {"weight": 60.0, "reps": "12", "note": null, "raw_weight": "60kg"}, {"weight": 70.0, "reps": "11", "note": null, "raw_weight": "70kg"}]}]}, {"num": 12, "date": "2026-05-18", "weekday": "2ªfeira", "treino": "A", "treino_raw": "A", "exercises": [{"muscle": "peito", "name": "peito abre e fecha", "name_key": "peito abre e fecha", "planned_sets": 4, "treino": "A", "sets": [{"weight": 45.0, "reps": "12", "note": null, "raw_weight": "45kg"}, {"weight": 50.0, "reps": "12", "note": null, "raw_weight": "50kg"}, {"weight": 55.0, "reps": "12", "note": null, "raw_weight": "55kg"}, {"weight": 60.0, "reps": "12", "note": null, "raw_weight": "60kg"}]}, {"muscle": "peito", "name": "halteres peito", "name_key": "halteres peito", "planned_sets": 4, "treino": "A", "sets": [{"weight": 10.0, "reps": "12", "note": null, "raw_weight": "10kg"}, {"weight": 12.5, "reps": "12", "note": null, "raw_weight": "12,5kg"}, {"weight": 17.5, "reps": "12", "note": null, "raw_weight": "17,5kg"}, {"weight": 17.5, "reps": "11", "note": null, "raw_weight": "17,5kg"}]}, {"muscle": "peito", "name": "peito máquina", "name_key": "peito maquina", "planned_sets": 4, "treino": "A", "sets": [{"weight": 30.0, "reps": "12", "note": null, "raw_weight": "30kg"}, {"weight": 40.0, "reps": "10", "note": null, "raw_weight": "40kg"}, {"weight": 40.0, "reps": "8", "note": null, "raw_weight": "40kg"}, {"weight": 35.0, "reps": "6", "note": null, "raw_weight": "35kg"}]}, {"muscle": "tricep", "name": "tricep corda", "name_key": "tricep corda", "planned_sets": 3, "treino": "A", "sets": [{"weight": 10.0, "reps": "20", "note": null, "raw_weight": "10kg"}, {"weight": 15.0, "reps": "11", "note": null, "raw_weight": "15kg"}, {"weight": 15.0, "reps": "11", "note": null, "raw_weight": "15kg"}]}, {"muscle": "tricep", "name": "tricep barra", "name_key": "tricep barra", "planned_sets": 3, "treino": "A", "sets": [{"weight": 20.0, "reps": "9", "note": null, "raw_weight": "20kg"}, {"weight": 20.0, "reps": "8", "note": null, "raw_weight": "20kg"}, {"weight": 15.0, "reps": "15", "note": null, "raw_weight": "15kg"}]}]}, {"num": 13, "date": "2026-05-19", "weekday": "3ªfeira", "treino": "B", "treino_raw": "B", "exercises": [{"muscle": "costas", "name": "puxar barra", "name_key": "puxar barra", "planned_sets": 4, "treino": "B", "sets": [{"weight": 40.0, "reps": "12", "note": null, "raw_weight": "40kg"}, {"weight": 55.0, "reps": "13", "note": null, "raw_weight": "55kg"}, {"weight": 60.0, "reps": "11", "note": null, "raw_weight": "60kg"}, {"weight": 60.0, "reps": "8", "note": null, "raw_weight": "60kg"}, {"weight": 40.0, "reps": "10", "note": null, "raw_weight": "40kg"}]}, {"muscle": "costas", "name": "seated row", "name_key": "seated row", "planned_sets": 4, "treino": "B", "sets": [{"weight": 25.0, "reps": "12", "note": null, "raw_weight": "25kg"}, {"weight": 40.0, "reps": "12", "note": null, "raw_weight": "40kg"}, {"weight": 50.0, "reps": "8", "note": null, "raw_weight": "50kg"}, {"weight": 50.0, "reps": "8", "note": null, "raw_weight": "50kg"}]}, {"muscle": "costas", "name": "costas abre e fecha", "name_key": "costas abre e fecha", "planned_sets": 4, "treino": "B", "sets": [{"weight": 15.0, "reps": "12", "note": null, "raw_weight": "15kg"}, {"weight": 30.0, "reps": "11", "note": null, "raw_weight": "30kg"}, {"weight": 30.0, "reps": "10", "note": null, "raw_weight": "30kg"}, {"weight": 30.0, "reps": "9", "note": null, "raw_weight": "30kg"}]}, {"muscle": "bicep", "name": "preacher curl", "name_key": "preacher curl", "planned_sets": 4, "treino": "B", "sets": [{"weight": 5.0, "reps": "8", "note": null, "raw_weight": "5kg"}, {"weight": 2.5, "reps": "10", "note": null, "raw_weight": "2,5kg"}, {"weight": 2.5, "reps": "10", "note": null, "raw_weight": "2,5kg"}, {"weight": 2.5, "reps": "9", "note": null, "raw_weight": "2,5kg"}]}]}, {"num": 14, "date": "2026-05-20", "weekday": "4ªfeira", "treino": "C", "treino_raw": "C", "exercises": [{"muscle": "pernas", "name": "leg press peso livre", "name_key": "leg press peso livre", "planned_sets": 4, "treino": "C", "sets": [{"weight": 25.0, "reps": "15", "note": null, "raw_weight": "25kg"}, {"weight": 50.0, "reps": "12", "note": null, "raw_weight": "50kg"}, {"weight": 50.0, "reps": "12", "note": null, "raw_weight": "50kg"}, {"weight": 50.0, "reps": "12", "note": null, "raw_weight": "50kg"}, {"weight": 50.0, "reps": "15", "note": null, "raw_weight": "50kg"}]}, {"muscle": "pernas", "name": "leg extension", "name_key": "leg extension", "planned_sets": 4, "treino": "C", "sets": [{"weight": 25.0, "reps": "12", "note": null, "raw_weight": "25kg"}, {"weight": 25.0, "reps": "12", "note": null, "raw_weight": "25kg"}, {"weight": 35.0, "reps": "15", "note": null, "raw_weight": "35kg"}, {"weight": 45.0, "reps": "10", "note": null, "raw_weight": "45kg"}]}, {"muscle": "pernas", "name": "seated leg curl", "name_key": "seated leg curl", "planned_sets": 4, "treino": "C", "sets": [{"weight": 30.0, "reps": "25", "note": null, "raw_weight": "30kg"}, {"weight": 55.0, "reps": "12", "note": null, "raw_weight": "55kg"}, {"weight": 65.0, "reps": "12", "note": null, "raw_weight": "65kg"}, {"weight": 75.0, "reps": "9", "note": null, "raw_weight": "75kg"}]}]}, {"num": 15, "date": "2026-05-21", "weekday": "5ªfeira", "treino": "A", "treino_raw": "A", "exercises": [{"muscle": "peito", "name": "supino", "name_key": "supino", "planned_sets": 4, "treino": "A", "sets": [{"weight": 10.0, "reps": "12", "note": null, "raw_weight": "10kg"}, {"weight": 15.0, "reps": "10", "note": null, "raw_weight": "15kg"}, {"weight": 15.0, "reps": "11", "note": null, "raw_weight": "15kg"}, {"weight": 15.0, "reps": "8", "note": null, "raw_weight": "15kg"}]}, {"muscle": "peito", "name": "peito maquina superior", "name_key": "peito maquina superior", "planned_sets": 4, "treino": "A", "sets": [{"weight": 5.0, "reps": "12", "note": null, "raw_weight": "5kg"}, {"weight": 10.0, "reps": "8", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "6", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "5", "note": null, "raw_weight": "10kg"}]}, {"muscle": "peito", "name": "peito abre e fecha", "name_key": "peito abre e fecha", "planned_sets": 4, "treino": "A", "sets": [{"weight": 50.0, "reps": "8", "note": null, "raw_weight": "50kg"}, {"weight": 40.0, "reps": "10", "note": null, "raw_weight": "40kg"}, {"weight": 40.0, "reps": "10", "note": null, "raw_weight": "40kg"}, {"weight": 40.0, "reps": "10", "note": null, "raw_weight": "40kg"}]}, {"muscle": "bicep", "name": "skull crushers", "name_key": "skull crushers", "planned_sets": 4, "treino": "A", "sets": [{"weight": 2.5, "reps": "8", "note": null, "raw_weight": "2,5kg"}, {"weight": 0.0, "reps": "20", "note": "barra", "raw_weight": "barra"}, {"weight": 2.5, "reps": "11", "note": null, "raw_weight": "2,5kg"}, {"weight": 2.5, "reps": "9", "note": null, "raw_weight": "2,5kg"}]}, {"muscle": "bicep", "name": "tricep corda roldana", "name_key": "tricep corda roldana", "planned_sets": 3, "treino": "A", "sets": [{"weight": 30.0, "reps": "8", "note": null, "raw_weight": "30kg"}, {"weight": 20.0, "reps": "11", "note": null, "raw_weight": "20kg"}, {"weight": 20.0, "reps": "11", "note": null, "raw_weight": "20kg"}]}]}, {"num": 16, "date": "2026-05-27", "weekday": "4ªfeira", "treino": "B", "treino_raw": "B", "exercises": [{"muscle": "costas", "name": "puxar barra", "name_key": "puxar barra", "planned_sets": 3, "treino": "B", "sets": [{"weight": 25.0, "reps": "12", "note": null, "raw_weight": "25kg"}, {"weight": 35.0, "reps": "10", "note": null, "raw_weight": "35kg"}, {"weight": 30.0, "reps": "11", "note": null, "raw_weight": "30kg"}]}, {"muscle": "costas", "name": "puxar maquina (barriga inclinada)", "name_key": "puxar maquina (barriga inclinada)", "planned_sets": 3, "treino": "B", "sets": [{"weight": 35.0, "reps": "10", "note": null, "raw_weight": "35kg"}, {"weight": 30.0, "reps": "10", "note": null, "raw_weight": "30kg"}, {"weight": 30.0, "reps": "12", "note": null, "raw_weight": "30kg"}]}, {"muscle": "costas", "name": "costas abre e fecha", "name_key": "costas abre e fecha", "planned_sets": 3, "treino": "B", "sets": [{"weight": 30.0, "reps": "12", "note": null, "raw_weight": "30kg"}, {"weight": 35.0, "reps": "12", "note": null, "raw_weight": "35kg"}, {"weight": 40.0, "reps": "8", "note": null, "raw_weight": "40kg"}]}, {"muscle": "bicep", "name": "curl maquina", "name_key": "curl maquina", "planned_sets": 3, "treino": "B", "sets": [{"weight": 15.0, "reps": "12", "note": null, "raw_weight": "15kg"}, {"weight": 20.0, "reps": "11", "note": null, "raw_weight": "20kg"}, {"weight": 20.0, "reps": "8", "note": null, "raw_weight": "20kg"}]}, {"muscle": "bicep", "name": "hammer curl", "name_key": "hammer curl", "planned_sets": 3, "treino": "B", "sets": [{"weight": 7.5, "reps": "10", "note": null, "raw_weight": "7,5kg"}, {"weight": 7.5, "reps": "8", "note": null, "raw_weight": "7,5kg"}, {"weight": 7.5, "reps": "10", "note": null, "raw_weight": "7,5kg"}]}]}, {"num": 17, "date": "2026-05-28", "weekday": "5ªfeira", "treino": "C", "treino_raw": "C", "exercises": [{"muscle": "pernas", "name": "leg press peso livre", "name_key": "leg press peso livre", "planned_sets": 4, "treino": "C", "sets": [{"weight": 30.0, "reps": "12", "note": null, "raw_weight": "30kg"}, {"weight": 40.0, "reps": "12", "note": null, "raw_weight": "40kg"}, {"weight": 55.0, "reps": "12", "note": null, "raw_weight": "55kg"}, {"weight": 65.0, "reps": "12", "note": null, "raw_weight": "65kg"}]}, {"muscle": "pernas", "name": "leg extension", "name_key": "leg extension", "planned_sets": 3, "treino": "C", "sets": [{"weight": 30.0, "reps": "12", "note": null, "raw_weight": "30kg"}, {"weight": 40.0, "reps": "11", "note": null, "raw_weight": "40kg"}, {"weight": 40.0, "reps": "10", "note": null, "raw_weight": "40kg"}, {"weight": 40.0, "reps": "11", "note": null, "raw_weight": "40kg"}]}, {"muscle": "pernas", "name": "seated leg curl", "name_key": "seated leg curl", "planned_sets": 4, "treino": "C", "sets": [{"weight": 60.0, "reps": "12", "note": null, "raw_weight": "60kg"}, {"weight": 70.0, "reps": "11", "note": null, "raw_weight": "70kg"}, {"weight": 70.0, "reps": "9", "note": null, "raw_weight": "70kg"}]}]}, {"num": 18, "date": "2026-05-29", "weekday": "6ªfeira", "treino": "A", "treino_raw": "A", "exercises": [{"muscle": "peito", "name": "peito abre e fecha", "name_key": "peito abre e fecha", "planned_sets": 4, "treino": "A", "sets": [{"weight": 40.0, "reps": "12", "note": null, "raw_weight": "40kg"}, {"weight": 50.0, "reps": "12", "note": null, "raw_weight": "50kg"}, {"weight": 50.0, "reps": "12", "note": null, "raw_weight": "50kg"}, {"weight": 60.0, "reps": "12", "note": null, "raw_weight": "60kg"}]}, {"muscle": "peito", "name": "peito máquina", "name_key": "peito maquina", "planned_sets": 4, "treino": "A", "sets": [{"weight": 5.0, "reps": "12", "note": null, "raw_weight": "5kg"}, {"weight": 10.0, "reps": "12", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "11", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "8", "note": null, "raw_weight": "10kg"}]}, {"muscle": "peito", "name": "peito maquina superior", "name_key": "peito maquina superior", "planned_sets": 4, "treino": "A", "sets": [{"weight": 5.0, "reps": "12", "note": null, "raw_weight": "5kg"}, {"weight": 5.0, "reps": "12", "note": null, "raw_weight": "5kg"}, {"weight": 5.0, "reps": "11", "note": null, "raw_weight": "5kg"}, {"weight": 5.0, "reps": "10", "note": null, "raw_weight": "5kg"}]}, {"muscle": "tricep", "name": "tricep corda", "name_key": "tricep corda", "planned_sets": 4, "treino": "A", "sets": [{"weight": 10.0, "reps": "20", "note": null, "raw_weight": "10kg"}, {"weight": 15.0, "reps": "12", "note": null, "raw_weight": "15kg"}, {"weight": 20.0, "reps": "9", "note": null, "raw_weight": "20kg"}, {"weight": 15.0, "reps": "11", "note": null, "raw_weight": "15kg"}]}, {"muscle": "tricep", "name": "tricep barra", "name_key": "tricep barra", "planned_sets": 4, "treino": "A", "sets": [{"weight": 15.0, "reps": "12", "note": null, "raw_weight": "15kg"}, {"weight": 20.0, "reps": "11", "note": null, "raw_weight": "20kg"}, {"weight": 20.0, "reps": "10", "note": null, "raw_weight": "20kg"}, {"weight": 20.0, "reps": "9", "note": null, "raw_weight": "20kg"}]}]}, {"num": 19, "date": "2026-06-01", "weekday": "2ªfeira", "treino": "B", "treino_raw": "B", "exercises": [{"muscle": "costas", "name": "costas abre e fecha", "name_key": "costas abre e fecha", "planned_sets": 4, "treino": "B", "sets": [{"weight": 40.0, "reps": "12", "note": null, "raw_weight": "40kg"}, {"weight": 50.0, "reps": "9", "note": null, "raw_weight": "50kg"}, {"weight": 45.0, "reps": "9", "note": null, "raw_weight": "45kg"}, {"weight": 45.0, "reps": "8", "note": null, "raw_weight": "45kg"}]}, {"muscle": "costas", "name": "puxar barra", "name_key": "puxar barra", "planned_sets": 4, "treino": "B", "sets": [{"weight": 39.5, "reps": "12", "note": null, "raw_weight": "39,5kg"}, {"weight": 52.0, "reps": "12", "note": null, "raw_weight": "52kg"}, {"weight": 58.5, "reps": "8", "note": null, "raw_weight": "58,5kg"}, {"weight": 52.0, "reps": "11", "note": null, "raw_weight": "52kg"}]}, {"muscle": "costas", "name": "puxar maquina (barriga inclinada)", "name_key": "puxar maquina (barriga inclinada)", "planned_sets": 4, "treino": "B", "sets": [{"weight": 30.0, "reps": "12", "note": null, "raw_weight": "30kg"}, {"weight": 35.0, "reps": "8", "note": null, "raw_weight": "35kg"}, {"weight": 30.0, "reps": "12", "note": null, "raw_weight": "30kg"}, {"weight": 35.0, "reps": "9", "note": null, "raw_weight": "35kg"}]}, {"muscle": "bicep", "name": "hammer curl", "name_key": "hammer curl", "planned_sets": 4, "treino": "B", "sets": [{"weight": 7.5, "reps": "12", "note": null, "raw_weight": "7,5kg"}, {"weight": 10.0, "reps": "11", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "12", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "15", "note": null, "raw_weight": "10kg"}]}, {"muscle": "bicep", "name": "curl maquina", "name_key": "curl maquina", "planned_sets": 4, "treino": "B", "sets": [{"weight": 15.0, "reps": "12", "note": null, "raw_weight": "15kg"}, {"weight": 20.0, "reps": "8", "note": null, "raw_weight": "20kg"}, {"weight": 15.0, "reps": "10", "note": null, "raw_weight": "15kg"}, {"weight": 15.0, "reps": "7", "note": null, "raw_weight": "15kg"}]}]}, {"num": 20, "date": "2026-06-02", "weekday": "3ªfeira", "treino": "C", "treino_raw": "C", "exercises": [{"muscle": "pernas", "name": "leg press peso livre", "name_key": "leg press peso livre", "planned_sets": 4, "treino": "C", "sets": [{"weight": 40.0, "reps": "12", "note": null, "raw_weight": "40kg"}, {"weight": 50.0, "reps": "12", "note": null, "raw_weight": "50kg"}, {"weight": 60.0, "reps": "12", "note": null, "raw_weight": "60kg"}, {"weight": 60.0, "reps": "10", "note": null, "raw_weight": "60kg"}]}, {"muscle": "pernas", "name": "leg extension", "name_key": "leg extension", "planned_sets": 3, "treino": "C", "sets": [{"weight": 25.0, "reps": "12", "note": null, "raw_weight": "25kg"}, {"weight": 40.0, "reps": "11", "note": null, "raw_weight": "40kg"}, {"weight": 45.0, "reps": "10", "note": null, "raw_weight": "45kg"}, {"weight": 45.0, "reps": "9", "note": null, "raw_weight": "45kg"}]}, {"muscle": "pernas", "name": "seated leg curl", "name_key": "seated leg curl", "planned_sets": 3, "treino": "C", "sets": [{"weight": 30.0, "reps": "25", "note": null, "raw_weight": "30kg"}, {"weight": 60.0, "reps": "12", "note": null, "raw_weight": "60kg"}, {"weight": 70.0, "reps": "11", "note": null, "raw_weight": "70kg"}]}]}, {"num": 21, "date": "2026-06-03", "weekday": "4ªfeira", "treino": "A", "treino_raw": "A", "exercises": [{"muscle": "peito", "name": "peito abre e fecha", "name_key": "peito abre e fecha", "planned_sets": 4, "treino": "A", "sets": [{"weight": 45.0, "reps": "12", "note": null, "raw_weight": "45kg"}, {"weight": 60.0, "reps": "12", "note": null, "raw_weight": "60kg"}, {"weight": 70.0, "reps": "12", "note": null, "raw_weight": "70kg"}, {"weight": 75.0, "reps": "8", "note": null, "raw_weight": "75kg"}]}, {"muscle": "peito", "name": "peito máquina", "name_key": "peito maquina", "planned_sets": 4, "treino": "A", "sets": [{"weight": 10.0, "reps": "11", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "7", "note": null, "raw_weight": "10kg"}, {"weight": 5.0, "reps": "10", "note": null, "raw_weight": "5kg"}, {"weight": 5.0, "reps": "10", "note": null, "raw_weight": "5kg"}]}, {"muscle": "peito", "name": "peito maquina superior", "name_key": "peito maquina superior", "planned_sets": 4, "treino": "A", "sets": [{"weight": 5.0, "reps": "10", "note": null, "raw_weight": "5kg"}, {"weight": 5.0, "reps": "10", "note": null, "raw_weight": "5kg"}, {"weight": 5.0, "reps": "8", "note": null, "raw_weight": "5kg"}, {"weight": 0.0, "reps": "15", "note": "peso maquina (nao especificado)", "raw_weight": "peso maquina"}]}, {"muscle": "tricep", "name": "tricep corda", "name_key": "tricep corda", "planned_sets": 4, "treino": "A", "sets": [{"weight": 10.0, "reps": "20", "note": null, "raw_weight": "10kg"}, {"weight": 22.5, "reps": "12", "note": null, "raw_weight": "22,5kg"}, {"weight": 15.0, "reps": "12", "note": null, "raw_weight": "15kg"}, {"weight": 15.0, "reps": "10", "note": null, "raw_weight": "15kg"}]}, {"muscle": "tricep", "name": "tricep barra", "name_key": "tricep barra", "planned_sets": 4, "treino": "A", "sets": [{"weight": 15.0, "reps": "12", "note": null, "raw_weight": "15kg"}, {"weight": 20.0, "reps": "12", "note": null, "raw_weight": "20kg"}, {"weight": 22.5, "reps": "8", "note": null, "raw_weight": "22,5kg"}, {"weight": 20.0, "reps": "12", "note": null, "raw_weight": "20kg"}]}]}, {"num": 22, "date": "2026-06-04", "weekday": "5ªfeira", "treino": "B", "treino_raw": "B", "exercises": [{"muscle": "costas", "name": "puxar barra", "name_key": "puxar barra", "planned_sets": 4, "treino": "B", "sets": [{"weight": 45.5, "reps": "12", "note": null, "raw_weight": "45,5kg"}, {"weight": 58.5, "reps": "12", "note": null, "raw_weight": "58,5kg"}, {"weight": 58.5, "reps": "11", "note": null, "raw_weight": "58,5kg"}, {"weight": 58.5, "reps": "9", "note": null, "raw_weight": "58,5kg"}]}, {"muscle": "costas", "name": "costas abre e fecha", "name_key": "costas abre e fecha", "planned_sets": 4, "treino": "B", "sets": [{"weight": 40.0, "reps": "12", "note": null, "raw_weight": "40kg"}, {"weight": 50.0, "reps": "11", "note": null, "raw_weight": "50kg"}, {"weight": 50.0, "reps": "7", "note": null, "raw_weight": "50kg"}, {"weight": 45.0, "reps": "9", "note": null, "raw_weight": "45kg"}]}, {"muscle": "costas", "name": "puxar maquina (barriga inclinada)", "name_key": "puxar maquina (barriga inclinada)", "planned_sets": 4, "treino": "B", "sets": [{"weight": 25.0, "reps": "13", "note": null, "raw_weight": "25kg"}, {"weight": 30.0, "reps": "10", "note": null, "raw_weight": "30kg"}, {"weight": 30.0, "reps": "9", "note": null, "raw_weight": "30kg"}, {"weight": 30.0, "reps": "8", "note": null, "raw_weight": "30kg"}]}, {"muscle": "bicep", "name": "hammer curl", "name_key": "hammer curl", "planned_sets": 4, "treino": "B", "sets": [{"weight": 7.5, "reps": "15", "note": null, "raw_weight": "7,5kg"}, {"weight": 10.0, "reps": "12", "note": null, "raw_weight": "10kg"}, {"weight": 12.0, "reps": "7", "note": null, "raw_weight": "12kg"}, {"weight": 10.0, "reps": "12", "note": null, "raw_weight": "10kg"}]}, {"muscle": "bicep", "name": "curl maquina", "name_key": "curl maquina", "planned_sets": 4, "treino": "B", "sets": [{"weight": 15.0, "reps": "12", "note": null, "raw_weight": "15kg"}, {"weight": 20.0, "reps": "12", "note": null, "raw_weight": "20kg"}, {"weight": 25.0, "reps": "9", "note": null, "raw_weight": "25kg"}, {"weight": 25.0, "reps": "9", "note": null, "raw_weight": "25kg"}]}]}, {"num": 23, "date": "2026-06-08", "weekday": "2ªfeira", "treino": "A", "treino_raw": "A", "exercises": [{"muscle": "peito", "name": "peito abre e fecha", "name_key": "peito abre e fecha", "planned_sets": 4, "treino": "A", "sets": [{"weight": 50.0, "reps": "12", "note": null, "raw_weight": "50kg"}, {"weight": 60.0, "reps": "12", "note": null, "raw_weight": "60kg"}, {"weight": 70.0, "reps": "10", "note": null, "raw_weight": "70kg"}, {"weight": 70.0, "reps": "8", "note": null, "raw_weight": "70kg"}]}, {"muscle": "peito", "name": "peito maquina superior", "name_key": "peito maquina superior", "planned_sets": 4, "treino": "A", "sets": [{"weight": 5.0, "reps": "12", "note": null, "raw_weight": "5kg"}, {"weight": 7.5, "reps": "12", "note": null, "raw_weight": "7,5kg"}, {"weight": 10.0, "reps": "12", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "8", "note": null, "raw_weight": "10kg"}]}, {"muscle": "peito", "name": "peito máquina", "name_key": "peito maquina", "planned_sets": 4, "treino": "A", "sets": [{"weight": 5.0, "reps": "12", "note": null, "raw_weight": "5kg"}, {"weight": 7.5, "reps": "11", "note": null, "raw_weight": "7,5kg"}, {"weight": 10.0, "reps": "8", "note": null, "raw_weight": "10kg"}, {"weight": 7.5, "reps": "8", "note": null, "raw_weight": "7,5kg"}]}, {"muscle": "tricep", "name": "tricep corda", "name_key": "tricep corda", "planned_sets": 4, "treino": "A", "sets": [{"weight": 10.0, "reps": "20", "note": null, "raw_weight": "10kg"}, {"weight": 20.0, "reps": "9", "note": null, "raw_weight": "20kg"}, {"weight": 15.0, "reps": "12", "note": null, "raw_weight": "15kg"}, {"weight": 15.0, "reps": "9", "note": null, "raw_weight": "15kg"}]}, {"muscle": "tricep", "name": "tricep barra", "name_key": "tricep barra", "planned_sets": 4, "treino": "A", "sets": [{"weight": 15.0, "reps": "12", "note": null, "raw_weight": "15kg"}, {"weight": 20.0, "reps": "15", "note": null, "raw_weight": "20kg"}, {"weight": 20.0, "reps": "15", "note": null, "raw_weight": "20kg"}, {"weight": 20.0, "reps": "15", "note": null, "raw_weight": "20kg"}]}]}, {"num": 24, "date": "2026-06-09", "weekday": "3ªfeira", "treino": "B", "treino_raw": "B", "exercises": [{"muscle": "costas", "name": "puxar barra", "name_key": "puxar barra", "planned_sets": 4, "treino": "B", "sets": [{"weight": 52.0, "reps": "12", "note": null, "raw_weight": "52kg"}, {"weight": 58.5, "reps": "12", "note": null, "raw_weight": "58,5kg"}, {"weight": 65.0, "reps": "10", "note": null, "raw_weight": "65kg"}, {"weight": 65.0, "reps": "9", "note": null, "raw_weight": "65kg"}]}, {"muscle": "costas", "name": "seated row", "name_key": "seated row", "planned_sets": 4, "treino": "B", "sets": [{"weight": 40.0, "reps": "12", "note": null, "raw_weight": "40kg"}, {"weight": 50.0, "reps": "9", "note": null, "raw_weight": "50kg"}, {"weight": 50.0, "reps": "9", "note": null, "raw_weight": "50kg"}, {"weight": 50.0, "reps": "10", "note": null, "raw_weight": "50kg"}]}, {"muscle": "costas", "name": "costas abre e fecha", "name_key": "costas abre e fecha", "planned_sets": 4, "treino": "B", "sets": [{"weight": 40.0, "reps": "12", "note": null, "raw_weight": "40kg"}, {"weight": 50.0, "reps": "9", "note": null, "raw_weight": "50kg"}, {"weight": 50.0, "reps": "7", "note": null, "raw_weight": "50kg"}, {"weight": 45.0, "reps": "9", "note": null, "raw_weight": "45kg"}]}, {"muscle": "bicep", "name": "curl maquina", "name_key": "curl maquina", "planned_sets": 4, "treino": "B", "sets": [{"weight": 15.0, "reps": "20", "note": null, "raw_weight": "15kg"}, {"weight": 20.0, "reps": "15", "note": null, "raw_weight": "20kg"}, {"weight": 25.0, "reps": "12", "note": null, "raw_weight": "25kg"}, {"weight": 30.0, "reps": "12", "note": null, "raw_weight": "30kg"}]}, {"muscle": "bicep", "name": "hammer curl", "name_key": "hammer curl", "planned_sets": 4, "treino": "B", "sets": [{"weight": 10.0, "reps": "11", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "10", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "10", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "9", "note": null, "raw_weight": "10kg"}]}]}, {"num": 25, "date": "2026-06-15", "weekday": "2ªfeira", "treino": "C", "treino_raw": "C", "exercises": [{"muscle": "pernas", "name": "leg press peso livre", "name_key": "leg press peso livre", "planned_sets": 4, "treino": "C", "sets": [{"weight": 40.0, "reps": "12", "note": null, "raw_weight": "40kg"}, {"weight": 50.0, "reps": "12", "note": null, "raw_weight": "50kg"}, {"weight": 60.0, "reps": "12", "note": null, "raw_weight": "60kg"}, {"weight": 70.0, "reps": "12", "note": null, "raw_weight": "70kg"}]}, {"muscle": "pernas", "name": "leg extension", "name_key": "leg extension", "planned_sets": 4, "treino": "C", "sets": [{"weight": 25.0, "reps": "12", "note": null, "raw_weight": "25kg"}, {"weight": 40.0, "reps": "12", "note": null, "raw_weight": "40kg"}, {"weight": 45.0, "reps": "11", "note": null, "raw_weight": "45kg"}, {"weight": 45.0, "reps": "9", "note": null, "raw_weight": "45kg"}]}, {"muscle": "pernas", "name": "seated leg curl", "name_key": "seated leg curl", "planned_sets": 4, "treino": "C", "sets": [{"weight": 30.0, "reps": "20", "note": null, "raw_weight": "30kg"}, {"weight": 65.0, "reps": "12", "note": null, "raw_weight": "65kg"}, {"weight": 75.0, "reps": "11", "note": null, "raw_weight": "75kg"}, {"weight": 75.0, "reps": "9", "note": null, "raw_weight": "75kg"}]}]}, {"num": 26, "date": "2026-06-17", "weekday": "4ªfeira", "treino": "B", "treino_raw": "B", "exercises": [{"muscle": "costas", "name": "puxar barra", "name_key": "puxar barra", "planned_sets": 4, "treino": "B", "sets": [{"weight": 30.0, "reps": "30", "note": null, "raw_weight": "30kg"}, {"weight": 52.0, "reps": "12", "note": null, "raw_weight": "52kg"}, {"weight": 65.0, "reps": "12", "note": null, "raw_weight": "65kg"}, {"weight": 65.0, "reps": "12", "note": null, "raw_weight": "65kg"}]}, {"muscle": "costas", "name": "seated row", "name_key": "seated row", "planned_sets": 3, "treino": "B", "sets": [{"weight": 40.0, "reps": "12", "note": null, "raw_weight": "40kg"}, {"weight": 50.0, "reps": "12", "note": null, "raw_weight": "50kg"}, {"weight": 55.0, "reps": "12", "note": null, "raw_weight": "55kg"}]}, {"muscle": "costas", "name": "costas abre e fecha", "name_key": "costas abre e fecha", "planned_sets": 3, "treino": "B", "sets": [{"weight": 40.0, "reps": "12", "note": null, "raw_weight": "40kg"}, {"weight": 50.0, "reps": "12", "note": null, "raw_weight": "50kg"}, {"weight": 55.0, "reps": "10", "note": null, "raw_weight": "55kg"}]}, {"muscle": "bicep", "name": "curl normal (sentado)", "name_key": "curl normal (sentado)", "planned_sets": 3, "treino": "B", "sets": [{"weight": 5.0, "reps": "20", "note": null, "raw_weight": "5kg"}, {"weight": 10.0, "reps": "12", "note": null, "raw_weight": "10kg"}, {"weight": 10.0, "reps": "10", "note": null, "raw_weight": "10kg"}]}]}, {"num": 27, "date": "2026-06-19", "weekday": "6ªfeira", "treino": "A", "treino_raw": "A", "exercises": [{"muscle": "peito", "name": "peito abre e fecha", "name_key": "peito abre e fecha", "planned_sets": 4, "treino": "A", "sets": [{"weight": 30.0, "reps": "25", "note": null, "raw_weight": "30kg"}, {"weight": 55.0, "reps": "12", "note": null, "raw_weight": "55kg"}, {"weight": 65.0, "reps": "12", "note": null, "raw_weight": "65kg"}, {"weight": 75.0, "reps": "10", "note": null, "raw_weight": "75kg"}]}, {"muscle": "peito", "name": "peito maquina superior", "name_key": "peito maquina superior", "planned_sets": 3, "treino": "A", "sets": [{"weight": 7.5, "reps": "12", "note": null, "raw_weight": "7,5kg"}, {"weight": 10.0, "reps": "12", "note": null, "raw_weight": "10kg"}, {"weight": 12.5, "reps": "9", "note": null, "raw_weight": "12,5kg"}]}, {"muscle": "peito", "name": "peito máquina", "name_key": "peito maquina", "planned_sets": 3, "treino": "A", "sets": [{"weight": 7.5, "reps": "11", "note": null, "raw_weight": "7,5kg"}, {"weight": 7.5, "reps": "7", "note": null, "raw_weight": "7.5"}, {"weight": 5.0, "reps": "11", "note": null, "raw_weight": "5kg"}]}, {"muscle": "tricep", "name": "tricep corda", "name_key": "tricep corda", "planned_sets": 3, "treino": "A", "sets": [{"weight": 10.0, "reps": "20", "note": null, "raw_weight": "10kg"}, {"weight": 20.0, "reps": "11", "note": null, "raw_weight": "20kg"}, {"weight": 20.0, "reps": "8", "note": null, "raw_weight": "20kg"}, {"weight": 15.0, "reps": "11", "note": null, "raw_weight": "15kg"}]}, {"muscle": "tricep", "name": "tricep barra", "name_key": "tricep barra", "planned_sets": 3, "treino": "A", "sets": [{"weight": 20.0, "reps": "12", "note": null, "raw_weight": "20kg"}, {"weight": 25.0, "reps": "9", "note": null, "raw_weight": "25kg"}, {"weight": 20.0, "reps": "15", "note": null, "raw_weight": "20kg"}]}]}, {"num": 28, "date": "2026-06-22", "weekday": "2ªfeira", "treino": "B", "treino_raw": "B", "exercises": [{"muscle": "costas", "name": "puxar barra", "name_key": "puxar barra", "planned_sets": 4, "treino": "B", "sets": [{"weight": 30.0, "reps": "30", "note": null, "raw_weight": "30kg"}, {"weight": 58.5, "reps": "12", "note": null, "raw_weight": "58,5kg"}, {"weight": 65.0, "reps": "11", "note": null, "raw_weight": "65kg"}, {"weight": 65.0, "reps": "10", "note": null, "raw_weight": "65kg"}]}, {"muscle": "costas", "name": "costas abre e fecha", "name_key": "costas abre e fecha", "planned_sets": 3, "treino": "B", "sets": [{"weight": 50.0, "reps": "12", "note": null, "raw_weight": "50kg"}, {"weight": 60.0, "reps": "8", "note": null, "raw_weight": "60kg"}, {"weight": 55.0, "reps": "8", "note": null, "raw_weight": "55kg"}]}, {"muscle": "bicep", "name": "curl maquina", "name_key": "curl maquina", "planned_sets": 3, "treino": "B", "sets": [{"weight": 15.0, "reps": "20", "note": null, "raw_weight": "15kg"}, {"weight": 25.0, "reps": "20", "note": null, "raw_weight": "25kg"}, {"weight": 35.0, "reps": "12", "note": null, "raw_weight": "35kg"}]}, {"muscle": "bicep", "name": "hammer curl", "name_key": "hammer curl", "planned_sets": 3, "treino": "B", "sets": [{"weight": 10.0, "reps": "12", "note": null, "raw_weight": "10kg"}, {"weight": 12.5, "reps": "12", "note": null, "raw_weight": "12,5kg"}, {"weight": 12.5, "reps": "12", "note": null, "raw_weight": "12,5kg"}]}]}]};
 // Exercício adicional (não vem do Excel): Corrida, um exercício de cardio em Treino C.
 // Não tem sets de peso/reps — em vez disso pede duração e distância.
 RAW_DATA.plan.C.push({muscle:'Cardio', exercise:'Corrida', sets:null, reps:null, type:'cardio'});
 RAW_DATA.muscle_to_treino['cardio'] = 'C';
+const RAW_ORIG = {sessions: RAW_DATA.sessions, plan: RAW_DATA.plan};
+// Modo de dados: 'owner' = dono da app (treinos do Excel + coleção original); 'user' = conta de amigo (começa vazia, dados só dela).
+let DATA_MODE = 'owner';
+let CUR_UID = null;
+function lsKey(base){ return (DATA_MODE === 'owner' || !CUR_UID) ? base : base + '_' + CUR_UID; }
 const WEEKDAY_PT = ['Domingo','2ªfeira','3ªfeira','4ªfeira','5ªfeira','6ªfeira','Sábado'];
 
 // ---------- Guias PDF descarregáveis (embutidos como data-URI, sem depender de internet) ----------
@@ -1022,7 +1048,107 @@ let SESSIONS_COL = null;
 let LEGACY_DOC_REF = null;
 let DB_REF = null;
 
+// ---------- Modo "sem conta": base de dados local (neste dispositivo) ----------
+// Imita a parte do Firestore que a app usa (collection/doc/set/delete/get/onSnapshot/batch),
+// mas guarda tudo no localStorage deste browser. Não precisa de internet nem de Firebase.
+const LOCAL_DB_KEY = 'ginasio_local_db_v1';
+const LOCAL_FLAG_KEY = 'ginasio_local_active';
+let LOCAL_MODE = false;
+const LocalDB = (function(){
+  let store = {};
+  try{ store = JSON.parse(localStorage.getItem(LOCAL_DB_KEY) || '{}') || {}; }catch(e){ store = {}; }
+  const listeners = [];
+  const clone = o => JSON.parse(JSON.stringify(o));
+  function persist(){
+    try{ localStorage.setItem(LOCAL_DB_KEY, JSON.stringify(store)); }
+    catch(e){ if(typeof showToast === 'function') showToast('Sem espaço para guardar neste dispositivo. Exporta os treinos (.csv).'); }
+  }
+  function notify(){ setTimeout(()=> listeners.slice().forEach(l=> l()), 0); }
+  function collSnap(path){
+    const c = store[path] || {};
+    return {docs: Object.keys(c).map(id=> ({id: id, data: ()=> clone(c[id])})), metadata: {fromCache: false}};
+  }
+  function docRef(path, id){
+    return {
+      id: id,
+      set(data, opts){
+        const c = store[path] = store[path] || {};
+        c[id] = (opts && opts.merge && c[id]) ? Object.assign({}, c[id], clone(data)) : clone(data);
+        persist(); notify(); return Promise.resolve();
+      },
+      delete(){ if(store[path]) delete store[path][id]; persist(); notify(); return Promise.resolve(); },
+      get(){ const d = store[path] && store[path][id]; return Promise.resolve({exists: !!d, data: ()=> d ? clone(d) : undefined}); },
+      onSnapshot(cb){
+        const fire = ()=>{ const d = store[path] && store[path][id]; cb({exists: !!d, data: ()=> d ? clone(d) : undefined, metadata: {fromCache: false}}); };
+        const l = fire; listeners.push(l); setTimeout(fire, 0);
+        return ()=>{ const i = listeners.indexOf(l); if(i >= 0) listeners.splice(i, 1); };
+      }
+    };
+  }
+  function collRef(path){
+    return {
+      doc(id){ return docRef(path, id); },
+      limit(){ return this; },
+      get(){ return Promise.resolve(collSnap(path)); },
+      onSnapshot(cb){
+        const fire = ()=> cb(collSnap(path));
+        listeners.push(fire); setTimeout(fire, 0);
+        return ()=>{ const i = listeners.indexOf(fire); if(i >= 0) listeners.splice(i, 1); };
+      }
+    };
+  }
+  return {
+    collection(name){
+      const api = collRef(name);
+      api.doc = function(id){
+        const d = docRef(name, id);
+        d.collection = sub => collRef(name + '/' + id + '/' + sub);
+        return d;
+      };
+      return api;
+    },
+    batch(){
+      const ops = [];
+      return {
+        set(ref, data, opts){ ops.push(()=> ref.set(data, opts)); return this; },
+        delete(ref){ ops.push(()=> ref.delete()); return this; },
+        commit(){ ops.forEach(f=> f()); return Promise.resolve(); }
+      };
+    }
+  };
+})();
+
+function startLocalMode(){
+  LOCAL_MODE = true;
+  try{ localStorage.setItem(LOCAL_FLAG_KEY, '1'); }catch(e){}
+  DB_REF = LocalDB;
+  applyDataMode('user', {uid: 'local', isAnonymous: false});
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('appRoot').style.display = 'block';
+  const g = document.getElementById('guestUpgradeBtn'); if(g) g.style.display = 'none';
+  startFirestoreSync();
+}
+function leaveLocalMode(){
+  LOCAL_MODE = false;
+  try{ localStorage.removeItem(LOCAL_FLAG_KEY); }catch(e){}
+  if(firestoreUnsub){ firestoreUnsub(); firestoreUnsub = null; }
+  if(planUnsub){ planUnsub(); planUnsub = null; }
+  PLAN_DOC_REF = null; extraSessions = []; planConfig = null; CUR_UID = null; DB_REF = null; SESSIONS_COL = null;
+  document.getElementById('loginOverlay').style.display = 'flex';
+  document.getElementById('appRoot').style.display = 'none';
+}
+(function wireLocalLogin(){
+  document.addEventListener('DOMContentLoaded', ()=>{
+    document.getElementById('guestBtn').addEventListener('click', startLocalMode);
+    document.getElementById('logoutBtn').addEventListener('click', ()=>{
+      if(LOCAL_MODE) leaveLocalMode();
+      else if(typeof firebase !== 'undefined') firebase.auth().signOut();
+    });
+  });
+})();
+
 function initFirebase(){
+  if(!LOCAL_MODE && localStorage.getItem(LOCAL_FLAG_KEY) === '1'){ startLocalMode(); }
   // Os SDKs carregam com "defer". Se ainda não chegaram, espera pelo fim do carregamento;
   // se mesmo assim não existirem (sem internet, bloqueados ou dentro de uma pré-visualização
   // isolada), mostra uma mensagem em vez de rebentar com "firebase is not defined".
@@ -1042,31 +1168,158 @@ function initFirebase(){
   const auth = firebase.auth();
   const db = firebase.firestore();
   db.enablePersistence({synchronizeTabs:true}).catch(()=>{ /* ok se já ativo noutro separador */ });
-  DB_REF = db;
+  if(!LOCAL_MODE) DB_REF = db;
   // Cada treino é o seu próprio documento — assim um dispositivo nunca pode apagar
   // sem querer o trabalho de outro dispositivo (ao contrário de guardar tudo num único array).
-  SESSIONS_COL = db.collection('ginasio_sessions');
-  LEGACY_DOC_REF = db.collection('ginasio').doc('treinos_extra');
 
   document.getElementById('loginBtn').addEventListener('click', ()=> doLogin(auth));
   document.getElementById('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(auth); });
   document.getElementById('loginEmail').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(auth); });
-  document.getElementById('logoutBtn').addEventListener('click', ()=> auth.signOut());
+  
+
+  document.getElementById('registerBtn').addEventListener('click', ()=> doRegister(auth));
+  document.getElementById('resetPassBtn').addEventListener('click', ()=>{
+    const email = document.getElementById('loginEmail').value.trim();
+    const errEl = document.getElementById('loginError');
+    if(!email){ errEl.textContent = 'Escreve o teu email e carrega de novo em "Esqueci a password".'; return; }
+    auth.sendPasswordResetEmail(email)
+      .then(()=>{ errEl.style.color = 'var(--ok)'; errEl.textContent = 'Enviámos um email para repor a password.'; })
+      .catch(err=>{ errEl.style.color = ''; errEl.textContent = 'Não consegui enviar o email: ' + err.message; });
+  });
 
   auth.onAuthStateChanged(user=>{
     if(user){
-      document.getElementById('loginOverlay').style.display = 'none';
-      document.getElementById('appRoot').style.display = 'block';
-      startFirestoreSync();
+      resolveDataMode(user).then(mode=>{
+        applyDataMode(mode, user);
+        document.getElementById('loginOverlay').style.display = 'none';
+        document.getElementById('appRoot').style.display = 'block';
+        startFirestoreSync();
+        offerLocalMigration(user);
+      });
     } else {
+      if(LOCAL_MODE) return;   // modo sem conta: não mexer
       document.getElementById('loginOverlay').style.display = 'flex';
       document.getElementById('appRoot').style.display = 'none';
       if(firestoreUnsub){ firestoreUnsub(); firestoreUnsub = null; }
       if(planUnsub){ planUnsub(); planUnsub = null; }
       PLAN_DOC_REF = null;
       extraSessions = [];
+      planConfig = null;
+      CUR_UID = null;
     }
   });
+}
+
+// Descobre se esta conta é a do dono da app (consegue ler a coleção original 'ginasio_sessions',
+// que as regras do Firebase só permitem ao dono) ou uma conta de amigo (dados em users/{uid}).
+async function resolveDataMode(user){
+  const cacheKey = 'ginasio_mode_' + user.uid;
+  if(user.isAnonymous) return 'user';
+  try{
+    await DB_REF.collection('ginasio_sessions').limit(1).get({source: 'server'});
+    try{ localStorage.setItem(cacheKey, 'owner'); }catch(e){}
+    return 'owner';
+  }catch(err){
+    if(err && err.code === 'permission-denied'){
+      try{ localStorage.setItem(cacheKey, 'user'); }catch(e){}
+      return 'user';
+    }
+    let cached = null;
+    try{ cached = localStorage.getItem(cacheKey); }catch(e){}
+    return cached || 'user';   // sem ligação: usa o último modo conhecido
+  }
+}
+
+function applyDataMode(mode, user){
+  DATA_MODE = mode;
+  CUR_UID = user.uid;
+  if(mode === 'owner'){
+    RAW_DATA.sessions = RAW_ORIG.sessions;
+    RAW_DATA.plan = RAW_ORIG.plan;
+    EXERCISE_RENAMES = EXERCISE_RENAMES_ALL;
+    SESSIONS_COL = DB_REF.collection('ginasio_sessions');
+    LEGACY_DOC_REF = DB_REF.collection('ginasio').doc('treinos_extra');
+    PLAN_DOC_REF = DB_REF.collection('ginasio_config').doc('plano');
+  } else {
+    RAW_DATA.sessions = [];
+    RAW_DATA.plan = {A: [], B: [], C: []};
+    EXERCISE_RENAMES = {};
+    const base = DB_REF.collection('users').doc(user.uid);
+    SESSIONS_COL = base.collection('sessions');
+    LEGACY_DOC_REF = null;
+    PLAN_DOC_REF = base.collection('config').doc('plano');
+  }
+  planConfig = null;
+  loadPlanLocal();
+  try{ checkDraftOnLoad(); }catch(e){}
+  try{ maybeShowHelp(); }catch(e){}
+  const guestBtn = document.getElementById('guestUpgradeBtn');
+  if(guestBtn) guestBtn.style.display = user.isAnonymous ? '' : 'none';
+}
+
+// Leva os treinos do modo "sem conta" (guardados neste dispositivo) para a conta com email.
+async function offerLocalMigration(user){
+  if(LOCAL_MODE || DATA_MODE !== 'user' || !user || user.isAnonymous) return;
+  const flag = 'ginasio_migr_' + user.uid;
+  try{ if(localStorage.getItem(flag) === '1') return; }catch(e){}
+  let st = null;
+  try{ st = JSON.parse(localStorage.getItem(LOCAL_DB_KEY) || 'null'); }catch(e){}
+  if(!st) return;
+  const sess = st['users/local/sessions'] || {};
+  const ids = Object.keys(sess);
+  const plan = st['users/local/config'] && st['users/local/config']['plano'];
+  if(!ids.length && !plan) return;
+  if(!window.confirm('Encontrei ' + ids.length + ' treino(s) guardado(s) neste dispositivo (modo sem conta). Queres levá-los para a tua conta?\n\nOs treinos que já existam na conta não são duplicados.')) return;
+  try{
+    const existing = await SESSIONS_COL.get();
+    const have = new Set();
+    existing.docs.forEach(d=>{ have.add(d.id); const x = d.data(); if(x && x.date) have.add(x.date + '|' + x.treino); });
+    let n = 0, ops = [];
+    ids.forEach(id=>{
+      const x = sess[id];
+      if(have.has(id) || (x && x.date && have.has(x.date + '|' + x.treino))) return;
+      ops.push([id, x]); n++;
+    });
+    for(let i = 0; i < ops.length; i += 400){
+      const b = DB_REF.batch();
+      ops.slice(i, i + 400).forEach(o=> b.set(SESSIONS_COL.doc(o[0]), o[1]));
+      await b.commit();
+    }
+    if(plan && PLAN_DOC_REF){
+      const cur = await PLAN_DOC_REF.get();
+      if(!cur.exists) await PLAN_DOC_REF.set(plan);
+    }
+    try{ localStorage.setItem(flag, '1'); }catch(e){}
+    showToast(n + ' treino(s) levados para a tua conta.');
+  }catch(err){
+    showToast('Não consegui levar os treinos: ' + (err && err.message || err));
+  }
+}
+
+function doRegister(auth){
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.style.color = ''; errEl.textContent = '';
+  if(!email || !pass){ errEl.textContent = 'Escreve um email e uma password (mínimo 6 caracteres) e carrega em "Criar conta".'; return; }
+  auth.createUserWithEmailAndPassword(email, pass).catch(err=>{
+    const m = {'auth/email-already-in-use':'Esse email já tem conta: carrega em "Entrar".', 'auth/weak-password':'A password é fraca: usa pelo menos 6 caracteres.', 'auth/invalid-email':'Email inválido.', 'auth/operation-not-allowed':'Criar contas ainda não está ativo: ativa "Email/Password" em Firebase → Authentication.'};
+    errEl.textContent = m[err.code] || ('Não consegui criar a conta: ' + err.message);
+  });
+}
+
+// Converte uma conta de convidado em conta com email (os treinos ficam; deixam de depender deste browser).
+function upgradeGuest(){
+  const user = firebase.auth().currentUser;
+  if(!user || !user.isAnonymous) return;
+  const email = window.prompt('Email para a tua conta:');
+  if(!email) return;
+  const pass = window.prompt('Escolhe uma password (mínimo 6 caracteres):');
+  if(!pass) return;
+  const cred = firebase.auth.EmailAuthProvider.credential(email.trim(), pass);
+  user.linkWithCredential(cred)
+    .then(()=>{ showToast('Conta criada. Os teus treinos ficam guardados.'); document.getElementById('guestUpgradeBtn').style.display = 'none'; })
+    .catch(err=> showToast('Não consegui criar a conta: ' + err.message));
 }
 
 function doLogin(auth){
@@ -1105,16 +1358,16 @@ function scheduleFullRerender(){
 
 function startFirestoreSync(){
   setSyncStatus('a sincronizar...', false);
-  migrateLegacyDocIfNeeded();
+  if(DATA_MODE === 'owner') migrateLegacyDocIfNeeded();
   // Plano de exercícios por treino, sincronizado entre dispositivos.
-  PLAN_DOC_REF = DB_REF.collection('ginasio_config').doc('plano');
   if(planUnsub){ planUnsub(); planUnsub = null; }
   planUnsub = PLAN_DOC_REF.onSnapshot(snap=>{
     if(snap.exists && snap.data() && snap.data().plan) applyRemotePlan(snap.data().plan);
   }, err=> console.error('Erro ao ler o plano', err));
   firestoreUnsub = SESSIONS_COL.onSnapshot(snap=>{
     extraSessions = snap.docs.map(d=> Object.assign({}, d.data(), {_fsId: d.id}));
-    setSyncStatus(snap.metadata.fromCache ? 'offline (guardado localmente)' : 'sincronizado', snap.metadata.fromCache);
+    if(LOCAL_MODE) setSyncStatus('só neste dispositivo', false);
+    else setSyncStatus(snap.metadata.fromCache ? 'offline (guardado localmente)' : 'sincronizado', snap.metadata.fromCache);
     scheduleFullRerender();
     // Sempre que os dados vêm confirmados do servidor (não da cache), aproveita para
     // verificar e limpar duplicados automaticamente.
@@ -1248,7 +1501,8 @@ function migrateLegacyDocIfNeeded(){
 // ---------- Nomes de exercícios unificados ----------
 // Chave normalizada (minúsculas, sem acentos) -> nome final. Usado para renomear treinos
 // antigos (migração única no Firestore) e para garantir que nada volta a gravar nomes antigos.
-const EXERCISE_RENAMES = {"supino": "supino", "incline push (supino)": "supino", "incline bench press": "supino", "halteres peito": "halteres peito", "halteres": "halteres peito", "halteres (supino reto)": "halteres peito", "peito maquina": "peito máquina", "maquina chest press": "peito máquina", "hammer curl": "hammer curl", "dumbell curl / ez-curl": "hammer curl", "curl hammer": "hammer curl", "puxar barra": "puxar barra", "pull down peso": "puxar barra", "puxar barra (pega fechada)": "puxar barra", "puxar barra (pega intermedia)": "puxar barra", "remada": "remada", "horizontal pull": "remada", "remada (dupla pega)": "remada", "remada com barra": "remada", "low row": "remada", "leg press peso livre": "leg press peso livre", "leg press": "leg press peso livre", "hack squat": "hack squat", "quads": "hack squat", "leg extension": "leg extension", "seated leg extension": "leg extension"};
+const EXERCISE_RENAMES_ALL = {"supino": "supino", "incline push (supino)": "supino", "incline bench press": "supino", "halteres peito": "halteres peito", "halteres": "halteres peito", "halteres (supino reto)": "halteres peito", "peito maquina": "peito máquina", "maquina chest press": "peito máquina", "hammer curl": "hammer curl", "dumbell curl / ez-curl": "hammer curl", "curl hammer": "hammer curl", "puxar barra": "puxar barra", "pull down peso": "puxar barra", "puxar barra (pega fechada)": "puxar barra", "puxar barra (pega intermedia)": "puxar barra", "remada": "remada", "horizontal pull": "remada", "remada (dupla pega)": "remada", "remada com barra": "remada", "low row": "remada", "leg press peso livre": "leg press peso livre", "leg press": "leg press peso livre", "hack squat": "hack squat", "quads": "hack squat", "leg extension": "leg extension", "seated leg extension": "leg extension"};
+let EXERCISE_RENAMES = EXERCISE_RENAMES_ALL;
 
 function renameSessionExercises(session){
   let changed = false;
@@ -1327,7 +1581,8 @@ function nextNum(){
 // no separador Progresso. Remover um exercício do plano NÃO apaga o histórico: se o voltares
 // a adicionar, o gráfico volta com todos os registos.
 // Sem personalização guardada, usa-se o plano do Excel + tudo o que já foi registado em cada treino.
-const PLAN_LS_KEY = 'ginasio_plan_v1';
+const PLAN_LS_BASE = 'ginasio_plan_v1';
+function planLsKey(){ return lsKey(PLAN_LS_BASE); }
 let planConfig = null;      // {A:[...], B:[...], C:[...]} ou null (= predefinido)
 let PLAN_DOC_REF = null;
 let planUnsub = null;
@@ -1367,7 +1622,7 @@ function sanitizePlan(p){
 
 function loadPlanLocal(){
   try{
-    const raw = localStorage.getItem(PLAN_LS_KEY);
+    const raw = localStorage.getItem(planLsKey());
     const p = raw ? sanitizePlan(JSON.parse(raw)) : null;
     if(p) planConfig = p;
   }catch(e){ /* sem plano local: usa o predefinido */ }
@@ -1416,7 +1671,7 @@ function rerenderPlanViews(){
 }
 
 function commitPlan(){
-  try{ localStorage.setItem(PLAN_LS_KEY, JSON.stringify(planConfig)); }catch(e){}
+  try{ localStorage.setItem(planLsKey(), JSON.stringify(planConfig)); }catch(e){}
   if(PLAN_DOC_REF){
     PLAN_DOC_REF.set({plan: planConfig, updatedAt: Date.now()}).catch(err=>{
       console.error('Erro ao sincronizar plano', err);
@@ -1430,7 +1685,7 @@ function applyRemotePlan(p){
   const clean = sanitizePlan(p);
   if(!clean) return;
   planConfig = clean;
-  try{ localStorage.setItem(PLAN_LS_KEY, JSON.stringify(planConfig)); }catch(e){}
+  try{ localStorage.setItem(planLsKey(), JSON.stringify(planConfig)); }catch(e){}
   rerenderPlanViews();
 }
 
@@ -1461,6 +1716,21 @@ function planRemove(t, key){
   commitPlan();
 }
 
+// Catálogo base de exercícios por grupo muscular (o mesmo que a folha "Grupos e exercícios" do modelo Excel).
+const STARTER_CATALOG = {
+  'Peito': ['supino','supino inclinado','halteres peito','peito máquina','peito abre e fecha','crucifixo','flexões'],
+  'Costas': ['puxar barra','remada','remada com barra','puxada','seated row','costas abre e fecha'],
+  'Ombros': ['overhead press','dumbell OHP (sentado)','elevações laterais','elevações frontais','face pull'],
+  'Bicep': ['curl normal (sentado)','hammer curl','preacher curl','curl maquina','curl barra'],
+  'Tricep': ['tricep corda','tricep barra','elevações tricep','tricep halteres (acima da cabeça)'],
+  'Pernas': ['agachamento','leg press peso livre','hack squat','leg extension','seated leg curl','deadlift','stiff','elevação de gémeos'],
+  'Glúteos': ['hip thrust','glute bridge','abdução máquina'],
+  'Abdominais': ['crunch','prancha','elevação de pernas'],
+  'Cardio': ['corrida','bicicleta','passadeira']
+};
+RAW_DATA.muscle_to_treino['glúteos'] = RAW_DATA.muscle_to_treino['glúteos'] || 'C';
+RAW_DATA.muscle_to_treino['abdominais'] = RAW_DATA.muscle_to_treino['abdominais'] || 'C';
+
 function allKnownExercises(){
   const pool = {};
   const add = (name, muscle, type)=>{
@@ -1471,6 +1741,7 @@ function allKnownExercises(){
   };
   ['A','B','C'].forEach(t=> (RAW_DATA.plan[t]||[]).forEach(e=> add(e.exercise, e.muscle, e.type)));
   allSessions().forEach(s=> (s.exercises||[]).forEach(ex=> add(ex.name, ex.muscle, ex.cardio ? 'cardio' : null)));
+  Object.keys(STARTER_CATALOG).forEach(g=> STARTER_CATALOG[g].forEach(n=> add(n, g, g === 'Cardio' ? 'cardio' : null)));
   if(planConfig) ['A','B','C'].forEach(t=> (planConfig[t]||[]).forEach(e=> add(e.exercise, e.muscle, e.type)));
   return Object.values(pool).sort((a,b)=> (a.muscle||'').toLowerCase().localeCompare((b.muscle||'').toLowerCase()) || a.exercise.localeCompare(b.exercise));
 }
@@ -1545,7 +1816,8 @@ function renderExercisesTab(){
 
 // ---------- Corpo: massa gorda, massa muscular, plano e alimentação ----------
 // ===BODY-START===
-const BODY_LS_KEY = 'ginasio_body_v1';
+const BODY_LS_BASE = 'ginasio_body_v1';
+function bodyLsKey(){ return lsKey(BODY_LS_BASE); }
 const ACTIVITY_FACTORS = {sedentario: 1.2, leve: 1.375, moderado: 1.55, alto: 1.725};
 
 function bClamp(x, lo, hi){ return Math.min(hi, Math.max(lo, x)); }
@@ -1787,10 +2059,10 @@ function readBodyInputs(){
 }
 
 function saveBodyInputs(i){
-  try{ localStorage.setItem(BODY_LS_KEY, JSON.stringify(i)); }catch(e){}
+  try{ localStorage.setItem(bodyLsKey(), JSON.stringify(i)); }catch(e){}
 }
 function loadBodyInputs(){
-  try{ const r = localStorage.getItem(BODY_LS_KEY); return r ? JSON.parse(r) : null; }catch(e){ return null; }
+  try{ const r = localStorage.getItem(bodyLsKey()); return r ? JSON.parse(r) : null; }catch(e){ return null; }
 }
 
 function renderBodyResults(){
@@ -2117,6 +2389,7 @@ function getDrillOverlay(){
     ov.addEventListener('click', e=>{
       if(e.target===ov || e.target.id==='drillClose'){ ov.style.display='none'; return; }
       const ed = e.target.closest('.day-edit'), dl = e.target.closest('.day-del'), ad = e.target.closest('.day-add');
+      if(e.target.closest('.imp-confirm')){ confirmImport(); return; }
       if(ed){ ov.style.display='none'; openEditSession(ed.dataset.key); }
       else if(dl) deleteSessionFromCalendar(dl.dataset.key);
       else if(ad){ ov.style.display='none'; document.querySelector('nav button[data-view="adicionar"]').click(); setSelectedDate(ad.dataset.date); showToast('Escolhe o treino e adiciona os exercícios de ' + formatDisplay(ad.dataset.date) + '.'); }
@@ -2128,9 +2401,11 @@ function getDrillOverlay(){
 function openDayModal(iso){
   const ov = getDrillOverlay();
   const sess = allSessions().filter(x=> x.date === iso);
+  document.getElementById('drillTitle').style.textTransform = 'none';
   document.getElementById('drillTitle').textContent = iso.split('-').reverse().join('/') + (sess.length ? ' · Treino ' + sess.map(x=>x.treino||'?').join(' + ') : '');
   const fmt = st => (st.weight!=null ? st.weight : (st.raw_weight || '—')) + (st.reps!=null && st.reps!=='' ? '×'+st.reps : '');
   const body = sess.map(x=>{
+    const k = escHtml(sessionKey(x));
     const exs = (x.exercises||[]).map(ex=>{
       let detail;
       if(ex.cardio){
@@ -2141,7 +2416,6 @@ function openDayModal(iso){
       } else detail = (ex.sets||[]).map(fmt).join(' · ') || '—';
       return `<tr><td style="text-transform:capitalize;"><strong>${escHtml(ex.name)}</strong><div class="meta" style="color:var(--muted);font-size:12px;">${escHtml(ex.muscle||'')}</div></td><td>${escHtml(detail)}</td></tr>`;
     }).join('');
-    const k = escHtml(sessionKey(x));
     return `<div style="margin-bottom:14px;"><div style="margin-bottom:6px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span class="badge ${x.treino||''}">${x.treino||'?'}</span> <span class="edit-hint" style="margin:0;">${(x.exercises||[]).length} exercícios</span><span style="margin-left:auto; display:flex; gap:8px;"><button type="button" class="btn small day-edit" data-key="${k}">Editar</button><button type="button" class="btn small danger day-del" data-key="${k}">Apagar treino</button></span></div><table class="drill-table"><thead><tr><th>Exercício</th><th>Sets (peso×reps)</th></tr></thead><tbody>${exs}</tbody></table></div>`;
   }).join('') || '<p class="edit-hint">Sem treino registado neste dia.</p>';
   const canAdd = iso <= dateToISO(new Date());
@@ -2150,6 +2424,7 @@ function openDayModal(iso){
   const db = document.getElementById('drillBody'); const h = db.querySelector('.edit-hint');
   db.style.setProperty('--hint-h', (h && h.parentNode===db ? h.offsetHeight : 0) + 'px'); db.scrollTop = 0;
 }
+
 
 function deleteSessionFromCalendar(key){
   const x = findSessionByKey(key);
@@ -2174,9 +2449,45 @@ function deleteSessionFromCalendar(key){
     scheduleFullRerender();
   }).catch(err=> showToast('Erro ao apagar: ' + (err && err.message || err)));
 }
+// ---------- Ajuda: como usar a app (menu ⋯ → Ajuda; abre sozinha à primeira vez) ----------
+const HELP_SEEN_KEY = 'ginasio_help_seen';
+const HELP_SECTIONS = [
+  ['O que é esta app', ['Serve para registares os teus treinos de ginásio (A, B e C), veres a evolução de cada exercício em gráficos e consultares tudo no histórico e no calendário.', 'Menu em baixo: Início, Progresso, Treinar (o botão +), Histórico e Mais (Plano, Exercícios, Calendário, Corpo). No computador o menu está à esquerda.']],
+  ['Entrar', ['Com conta: sincroniza entre telemóvel e computador. Escreve email e password e carrega em "Criar conta" (da primeira vez) ou "Entrar".', 'Sem conta: carrega em "Usar sem conta". Os treinos ficam guardados no histórico deste browser, funcionam sem internet e não passam para outros aparelhos. Se limpares os dados do browser perdem-se, por isso exporta de vez em quando (menu ⋯ → Exportar).']],
+  ['Criar exercícios e organizar os treinos', ['Vai a Mais → Exercícios. Cada treino (A, B, C) tem a sua lista.', 'Para adicionar: escolhe um exercício da lista, ou "Novo exercício" para escrever o nome e o grupo muscular (ex: Peito, Costas, Pernas). Carrega em Adicionar.', 'Usa sempre o mesmo nome para o mesmo exercício: o gráfico junta todos os registos com esse nome.', '"Remover" tira o exercício da lista do treino, mas o histórico fica guardado e o gráfico volta se o adicionares de novo.']],
+  ['Registar um treino', ['Carrega em Treinar. Escolhe a data e o treino (A, B ou C).', 'Em "+ Escolher exercício" junta os exercícios que fizeste. Aparece um de cada vez; usa "Anterior / Seguinte" para passar de um para outro.', 'Em cada set escreve o peso (kg) e as repetições. Para exercícios sem peso escreve "barra", "corpo" ou "máquina". Carrega em ✓ quando terminas o set. "+ set" acrescenta um set (máximo 6).', '"Warm-up" marca que o exercício teve aquecimento. O ✕ vermelho no topo do exercício retira-o do treino, útil se escolheste o errado.', '"Repetir anterior" copia os exercícios e pesos do último treino desse tipo. A app guarda um rascunho automático: se saíres a meio, podes continuar depois.', 'No fim, "Guardar treino".']],
+  ['Ver a evolução', ['Em Progresso há um gráfico por exercício, separado por treino. Toca num gráfico para veres a tabela com todas as datas, o melhor set e a diferença para o treino anterior.', 'No Início vês a semana, o último treino e a comparação do mês com o anterior.']],
+  ['Histórico e Calendário (corrigir erros)', ['Histórico: cada treino tem "Editar" e "Apagar". Em Editar podes mudar a data, os sets, adicionar exercícios ou remover um exercício isolado. Os gráficos ajustam-se sozinhos.', 'Calendário: os dias com treino mostram A, B ou C. Toca num dia para ver os exercícios, editar, apagar ou adicionar um treino nesse dia.']],
+  ['Importar e exportar', ['Menu ⋯ → "Modelo Excel" descarrega uma folha para preencheres (tem uma folha de exemplo e outra com os grupos musculares e exercícios). Depois "Importar" lê só a folha "Dados" e mostra o que vai entrar antes de gravar.', '"Exportar" descarrega todos os teus treinos em .csv, como cópia de segurança.']],
+  ['Corpo', ['Em Mais → Corpo calculas gordura corporal, massa muscular e vês sugestões de treino e alimentação para o teu objetivo. Os dados ficam só neste dispositivo.']]
+];
+function openHelp(){
+  const ov = getDrillOverlay();
+  document.getElementById('drillTitle').textContent = 'Como usar a app'; document.getElementById('drillTitle').style.textTransform = 'none';
+  document.getElementById('drillBody').innerHTML = HELP_SECTIONS.map(sec=>
+    `<div class="help-sec"><h3>${escHtml(sec[0])}</h3>${sec[1].map(p=> `<p>${escHtml(p)}</p>`).join('')}</div>`
+  ).join('') + '<button type="button" class="btn primary" id="helpDoneBtn" style="width:100%; margin-top:6px;">Percebi</button>';
+  const db = document.getElementById('drillBody');
+  db.style.setProperty('--hint-h', '0px'); db.scrollTop = 0;
+  ov.style.display = 'flex';
+  try{ localStorage.setItem(HELP_SEEN_KEY, '1'); }catch(e){}
+}
+function maybeShowHelp(){
+  let seen = false;
+  try{ seen = localStorage.getItem(HELP_SEEN_KEY) === '1'; }catch(e){}
+  if(!seen) setTimeout(openHelp, 500);
+}
+document.addEventListener('DOMContentLoaded', ()=>{
+  const b = document.getElementById('helpBtn');
+  if(b) b.addEventListener('click', ()=>{ document.getElementById('appHeader').classList.remove('menu-open'); openHelp(); });
+});
+document.addEventListener('click', e=>{
+  if(e.target && e.target.id === 'helpDoneBtn') document.getElementById('drillOverlay').style.display = 'none';
+});
+
 function openDrill(g, unit, t){
   const ov = getDrillOverlay();
-  document.getElementById('drillTitle').textContent = g.name;
+  document.getElementById('drillTitle').textContent = g.name; document.getElementById('drillTitle').style.textTransform = 'capitalize';
   const pts = g.points.slice().reverse();
   const fmt = st => (st.weight!=null ? st.weight : '—') + (st.reps!=null && st.reps!=='' ? '×'+st.reps : '');
   const rows = pts.map((p,i)=>{
@@ -2355,6 +2666,7 @@ function buildExerciseBlock(exDef, isExtra){
         <button type="button" class="reorder-btn move-up-btn" title="Mover para cima">▲</button>
         <button type="button" class="reorder-btn move-down-btn" title="Mover para baixo">▼</button>
       </div>
+      <button type="button" class="reorder-btn ex-remove-btn" title="Remover este exercício do treino" aria-label="Remover exercício">✕</button>
     </div>
     ${lastTimeHtml}
     ${(!isExtra && hasApertureField(exDef.exercise)) ? `<label class="aperture-field">
@@ -2406,6 +2718,7 @@ function buildExerciseBlock(exDef, isExtra){
   });
   div.querySelector('.move-up-btn').addEventListener('click', ()=> moveBlock(div, -1));
   div.querySelector('.move-down-btn').addEventListener('click', ()=> moveBlock(div, 1));
+  div.querySelector('.ex-remove-btn').addEventListener('click', ()=> removeExerciseBlock(div));
   if(isExtra){
     const nameInput = div.querySelector('.ex-name-input');
     nameInput.addEventListener('blur', ()=>{
@@ -2441,6 +2754,7 @@ function buildCardioBlock(exDef){
         <button type="button" class="reorder-btn move-up-btn" title="Mover para cima">▲</button>
         <button type="button" class="reorder-btn move-down-btn" title="Mover para baixo">▼</button>
       </div>
+      <button type="button" class="reorder-btn ex-remove-btn" title="Remover este exercício do treino" aria-label="Remover exercício">✕</button>
     </div>
     ${lastTimeHtml}
     <div class="form-row" style="margin-bottom:4px;">
@@ -2450,6 +2764,7 @@ function buildCardioBlock(exDef){
   `;
   div.querySelector('.move-up-btn').addEventListener('click', ()=> moveBlock(div, -1));
   div.querySelector('.move-down-btn').addEventListener('click', ()=> moveBlock(div, 1));
+  div.querySelector('.ex-remove-btn').addEventListener('click', ()=> removeExerciseBlock(div));
   return div;
 }
 
@@ -2565,6 +2880,19 @@ function getExerciseBlocks(){
 }
 
 // Permite reordenar os exercícios dentro do treino usando as setas ▲▼ de cada bloco.
+
+// Remove um exercício do treino que está a ser registado (ex: escolheste o errado no ginásio).
+function removeExerciseBlock(block){
+  const name = block.dataset.exName || (block.querySelector('.ex-name-input') ? block.querySelector('.ex-name-input').value.trim() : '') || 'este exercício';
+  const hasData = Array.from(block.querySelectorAll('.set-weight, .set-reps, .cardio-duration, .cardio-distance')).some(i=> i.value.trim() !== '');
+  if(hasData && !window.confirm(`Remover "${name}" deste treino? Os valores que escreveste perdem-se.`)) return;
+  block.remove();
+  updateExerciseFormState();
+  updateFocusNav();
+  scheduleDraftSave();
+  showToast(`"${name}" removido do treino.`);
+}
+
 function moveBlock(block, dir){
   const area = document.getElementById('exerciseFormArea');
   const blocks = getExerciseBlocks();
@@ -2652,17 +2980,17 @@ function saveDraftNow(){
   try{
     const state = serializeFormState();
     if(!state.blocks.length && !state.treino) return;
-    localStorage.setItem('ginasio_draft', JSON.stringify(state));
+    localStorage.setItem(lsKey('ginasio_draft'), JSON.stringify(state));
   }catch(e){ /* ignora erros de armazenamento */ }
 }
 function clearDraft(){
-  try{ localStorage.removeItem('ginasio_draft'); }catch(e){}
+  try{ localStorage.removeItem(lsKey('ginasio_draft')); }catch(e){}
   const banner = document.getElementById('draftBanner');
   if(banner) banner.style.display = 'none';
 }
 function loadDraft(){
   try{
-    const raw = localStorage.getItem('ginasio_draft');
+    const raw = localStorage.getItem(lsKey('ginasio_draft'));
     return raw ? JSON.parse(raw) : null;
   }catch(e){ return null; }
 }
@@ -3371,12 +3699,14 @@ function importSessionsFromCsv(text){
   return sessions.filter(s=> s.exercises.length && s.date);
 }
 
+document.getElementById('templateBtn').addEventListener('click', downloadTemplate);
 document.getElementById('importBtn').addEventListener('click', ()=>{
   document.getElementById('importFileInput').click();
 });
 document.getElementById('importFileInput').addEventListener('change', e=>{
   const file = e.target.files[0];
   if(!file) return;
+  if(/\.xlsx?$/i.test(file.name)){ importXlsxFile(file); e.target.value = ''; return; }
   const reader = new FileReader();
   reader.onload = ()=>{
     let sessions;
@@ -3408,12 +3738,190 @@ document.getElementById('importFileInput').addEventListener('change', e=>{
       })
       .finally(()=>{
         btn.disabled = false;
-        btn.textContent = 'Importar (.csv)';
+        btn.textContent = 'Importar (.xlsx / .csv)';
         e.target.value = '';
       });
   };
   reader.readAsText(file, 'utf-8');
 });
+
+
+// ---------- Importar modelo Excel (.xlsx) ----------
+// Lê SÓ a folha "Dados" do modelo. A folha "Exemplo" nunca é lida e, por segurança, linhas com
+// datas anteriores a 2015 (as do exemplo estão em 2000) são ignoradas.
+const TEMPLATE_XLSX_B64 = "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M6nOkntfzz/eP/z58ce7u6erv7x98+7xxfWPT0/vv3n27PHVj3dvbx9/c//+7t1f3r75/v7h7e3T42/uH3549vj+4e72u88Pevvm2ebm5vDs7e3rd9cvn3/+vd8/vHx+/+Hpzet3d79/uHr88Pbt7cNfv717c//xxfVy/bff+MPrH358+vQbz14+f3/7w90f757+9/vfPzx7+fzZ18/y3eu3d+8eX9+/u3q4+/7F9e+Wb/r+5vMjPn/Iv72++/g4/PXVp+fyp/v7P3/6Rf3uxfXN9afP/e7u6q9/fP/m9ee/29XT/ft/ufv+Kdy9efPi+neb66vbV0+v//Pu97fv7l5c/+n+6en+7Se/vnp8un26e3H9/cP9/7l79/nveffm7tXTp3+a9//lg3/6JF8+6acn+R9f/omvvz6hT/9Q41//7Z88fb7s7x+u/nT7eBfu3/z76++efnxxfbq++u7u+9sPb57+cP+x3H251v7T53t1/+bx8/+8+vjTxy7b66tXHx6f7t9+efByffX29buf/vftX75ceXjAWXz85svHb6aPX47iAdsvD9hOD9juxAN2Xx6wmx5wEB+///Lx+/mfaBEPOHx5wOEXPuXjl48/zn+DG/GA05cHnOYHqKdw/vKA8/wAdaNPf+uf/rXd/OKHfP03/dNX3E9fIp+/vuz26fbl84f7j1cPnz/+09fRdvO3z/P1K+v65fNXnz7i81fv539PTy+uX7/79J/iPz49XL98/vrx5fOnl58+2/NnTy+fP/v062evvjzqW37U/3q4e/3u3nlc4Mflhw/v76/efnh89eHN7YPzeOPHx7/cPbz6x3/YbI+/ffXa+/tHfvwf756cByV+0O/vHu+vfv3nH/7JeWjmh/7h7v2j86jCj/r324e3//PDe+eB9efOe/vh6ru7q9s/3T08fXjw/sW2n/lyeP349I//sNkcfvvu1evbq1//+a33rPvPfJIPD7ef/iUtv/30qY6/vb/69dvX76ZP9Ozh/uPXL+PN16/WzefPvP/8mT/9X6DLV+RPcvivEqSYlCglSclSipQqpUnpnqzOtf16rq0811aeS4pJiVKSlCylSKlSmpTuyepcu6/n2slz7eS5pJiUKCVJyVKKlCqlSemerM61/3quvTzXXp5LikmJUpKULKVIqVKalO7J6lyHr+c6yHMd5LmkmJQoJUnJUoqU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";
+const IMPORT_MIN_YEAR = 2015;
+let pendingImport = null;
+
+function downloadTemplate(){
+  const bin = atob(TEMPLATE_XLSX_B64);
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  const blob = new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'modelo_treinos_ginasio.xlsx';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=> URL.revokeObjectURL(a.href), 2000);
+}
+
+function templateCellToISO(v, ssf){
+  if(v === null || v === undefined || v === '') return null;
+  if(v instanceof Date){
+    return v.getFullYear() + '-' + String(v.getMonth()+1).padStart(2,'0') + '-' + String(v.getDate()).padStart(2,'0');
+  }
+  if(typeof v === 'number' && ssf){
+    const p = ssf.parse_date_code(v);
+    if(!p) return null;
+    return p.y + '-' + String(p.m).padStart(2,'0') + '-' + String(p.d).padStart(2,'0');
+  }
+  const t = String(v).trim();
+  let m = t.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/);
+  if(m) return m[3] + '-' + m[2].padStart(2,'0') + '-' + m[1].padStart(2,'0');
+  m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return m[1] + '-' + m[2].padStart(2,'0') + '-' + m[3].padStart(2,'0');
+  return null;
+}
+function tplNum(v){
+  if(v === null || v === undefined || v === '') return null;
+  const n = parseFloat(String(v).replace(',', '.'));
+  return isNaN(n) ? null : n;
+}
+
+// rows = linhas da folha "Dados" (array de arrays, 1.ª linha = cabeçalhos).
+function parseTemplateRows(rows, ssf){
+  const out = {sessions: [], errors: [], ignoredExample: 0, rowsRead: 0};
+  if(!rows || !rows.length) return out;
+  const head = rows[0].map(h=> normKey(String(h||'')));
+  const col = name => head.indexOf(normKey(name));
+  const C = {date: col('Data'), treino: col('Treino'), muscle: col('Grupo muscular'), ex: col('Exercício'), set: col('Set'),
+    peso: col('Peso (kg)'), reps: col('Reps'), warm: col('Warm-up'), ap: col('Grau de abertura'), dist: col('Distância (km)'), dur: col('Duração (min)')};
+  const need = ['date','treino','ex'];
+  const miss = need.filter(k=> C[k] < 0);
+  if(miss.length) throw new Error('A folha "Dados" não tem os cabeçalhos do modelo (faltam: ' + miss.map(k=> ({date:'Data',treino:'Treino',ex:'Exercício'})[k]).join(', ') + '). Usa o modelo original.');
+  const map = {};
+  for(let r=1; r<rows.length; r++){
+    const row = rows[r] || [];
+    const g = k => C[k] >= 0 ? row[C[k]] : null;
+    const empty = row.every(c=> c === null || c === undefined || String(c).trim() === '');
+    if(empty) continue;
+    out.rowsRead++;
+    const line = r + 1;
+    const iso = templateCellToISO(g('date'), ssf);
+    if(!iso){ out.errors.push(`Linha ${line}: data inválida (usa dd/mm/aaaa).`); continue; }
+    if(parseInt(iso.slice(0,4), 10) < IMPORT_MIN_YEAR){ out.ignoredExample++; continue; }
+    if(iso > dateToISO(new Date())){ out.errors.push(`Linha ${line}: a data ${formatDisplay(iso)} está no futuro.`); continue; }
+    const treino = String(g('treino') || '').trim().toUpperCase();
+    if(!['A','B','C'].includes(treino)){ out.errors.push(`Linha ${line}: treino tem de ser A, B ou C.`); continue; }
+    const name = String(g('ex') || '').trim();
+    if(!name){ out.errors.push(`Linha ${line}: falta o nome do exercício.`); continue; }
+    const muscle = String(g('muscle') || '').trim();
+    const sk = iso + '|' + treino;
+    if(!map[sk]){
+      const d = isoToDate(iso);
+      map[sk] = {date: iso, weekday: WEEKDAY_PT[d.getDay()], treino: treino, treino_raw: treino, source: 'app', exercises: [], _exIdx: {}};
+      out.sessions.push(map[sk]);
+    }
+    const sess = map[sk];
+    const ek = normKey(name);
+    let ex = sess._exIdx[ek];
+    const dist = tplNum(g('dist')), dur = tplNum(g('dur'));
+    const isCardio = normKey(muscle) === 'cardio' || ((dist !== null || dur !== null) && g('peso') == null && g('reps') == null);
+    if(!ex){
+      ex = {muscle: muscle || null, name: name, name_key: ek, planned_sets: 0, treino: treino, sets: []};
+      if(isCardio) ex.cardio = true;
+      sess._exIdx[ek] = ex; sess.exercises.push(ex);
+    }
+    const warm = normKey(String(g('warm') || ''));
+    if(warm === 'sim' || warm === 's' || warm === 'yes') ex.hasWarmup = true;
+    const ap = tplNum(g('ap'));
+    if(ap !== null) ex.aperture = ap;
+    if(isCardio){
+      if(dist === null && dur === null){ out.errors.push(`Linha ${line}: cardio precisa de distância e/ou duração.`); continue; }
+      ex.sets = [{weight: dist, reps: dur !== null ? dur + ' min' : 'N/A', note: 'cardio', raw_weight: dist !== null ? dist + 'km' : null, duration_min: dur, distance_km: dist}];
+      ex.planned_sets = 1;
+      continue;
+    }
+    const rawW = g('peso') === null || g('peso') === undefined ? '' : String(g('peso')).trim();
+    const parsed = parseWeightInput(rawW);
+    const reps = g('reps') === null || g('reps') === undefined ? '' : String(g('reps')).trim();
+    if(parsed.weight === null && !parsed.note && reps === ''){ out.errors.push(`Linha ${line}: set sem peso nem reps.`); continue; }
+    if(ex.sets.length >= 6){ out.errors.push(`Linha ${line}: "${name}" já tem 6 sets nesse dia; este foi ignorado.`); continue; }
+    ex.sets.push({weight: parsed.weight, reps: reps || null, note: parsed.note, raw_weight: rawW || null});
+    ex.planned_sets = ex.sets.length;
+  }
+  out.sessions.forEach(s=>{ delete s._exIdx; s.exercises = s.exercises.filter(e=> e.sets.length); });
+  out.sessions = out.sessions.filter(s=> s.exercises.length);
+  return out;
+}
+
+function showImportPreview(res, fileName){
+  const ov = getDrillOverlay();
+  const existing = new Set(allSessions().map(s=> s.date + '|' + (s.treino||'')));
+  const fresh = res.sessions.filter(s=> !existing.has(s.date + '|' + s.treino));
+  const skipped = res.sessions.filter(s=> existing.has(s.date + '|' + s.treino));
+  pendingImport = fresh;
+  document.getElementById('drillTitle').textContent = 'Importar treinos'; document.getElementById('drillTitle').style.textTransform = 'none';
+  const nEx = fresh.reduce((a,s)=> a + s.exercises.length, 0);
+  const nSets = fresh.reduce((a,s)=> a + s.exercises.reduce((b,e)=> b + e.sets.length, 0), 0);
+  let html = `<p class="edit-hint" style="margin:0 0 10px;">Ficheiro: ${escHtml(fileName)}. Só a folha "Dados" foi lida.</p>`;
+  html += `<p style="margin:0 0 10px;"><strong>${fresh.length}</strong> treino(s) novo(s), ${nEx} exercício(s), ${nSets} set(s).</p>`;
+  if(res.ignoredExample) html += `<p class="edit-hint">${res.ignoredExample} linha(s) de exemplo (datas anteriores a ${IMPORT_MIN_YEAR}) foram ignoradas.</p>`;
+  if(skipped.length) html += `<p class="edit-hint">${skipped.length} treino(s) já existem na app (mesma data e treino) e não serão importados: ${skipped.map(s=> formatDisplay(s.date) + ' ' + s.treino).map(escHtml).join(', ')}.</p>`;
+  if(res.errors.length) html += `<div class="body-warn"><strong>${res.errors.length} linha(s) com problemas (não importadas):</strong><br>${res.errors.slice(0,12).map(escHtml).join('<br>')}${res.errors.length>12 ? '<br>…' : ''}</div>`;
+  if(fresh.length){
+    html += '<table class="drill-table"><thead><tr><th>Data</th><th>Treino</th><th>Exercícios</th></tr></thead><tbody>' +
+      fresh.map(s=> `<tr><td>${formatDisplay(s.date)}</td><td><span class="badge ${s.treino}">${s.treino}</span></td><td style="text-transform:capitalize;">${s.exercises.map(e=> escHtml(e.name)).join(', ')}</td></tr>`).join('') + '</tbody></table>';
+    html += `<button type="button" class="btn primary imp-confirm" style="width:100%; margin-top:14px;">Importar ${fresh.length} treino(s)</button>`;
+  } else {
+    html += '<p class="edit-hint">Não há nada de novo para importar.</p>';
+  }
+  document.getElementById('drillBody').innerHTML = html;
+  ov.style.display = 'flex';
+  document.getElementById('drillBody').scrollTop = 0;
+}
+
+function confirmImport(){
+  const list = pendingImport || [];
+  if(!list.length) return;
+  if(!DB_REF || !SESSIONS_COL){ showToast('Tens de estar com login feito para importar.'); return; }
+  document.getElementById('drillOverlay').style.display = 'none';
+  const base = nextNum();
+  list.forEach((s,i)=> s.num = base + i);
+  const batch = DB_REF.batch();
+  list.forEach(s=>{
+    const doc = renameSessionExercises(cloneJson(s)).session;
+    batch.set(SESSIONS_COL.doc(stableSessionId(doc)), doc, {merge:true});
+  });
+  const cardioAndNew = [];
+  list.forEach(s=> s.exercises.forEach(e=> cardioAndNew.push({exercise: e.name, muscle: e.muscle || '', type: e.cardio ? 'cardio' : null, treino: s.treino})));
+  batch.commit().then(()=>{
+    // Exercícios importados passam a existir no plano do treino respetivo (para os gráficos aparecerem).
+    if(planConfig){ ['A','B','C'].forEach(t=>{ const items = cardioAndNew.filter(x=> x.treino === t); if(items.length) planAddMany(t, items); }); }
+    showToast(list.length + ' treino(s) importado(s).');
+    scheduleFullRerender();
+  }).catch(err=> showToast('Erro ao importar: ' + (err && err.message || err)));
+  pendingImport = null;
+}
+
+function importXlsxFile(file){
+  if(typeof XLSX === 'undefined'){ showToast('A biblioteca do Excel não carregou (sem internet?). Tenta de novo ou usa um .csv.'); return; }
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const wb = XLSX.read(new Uint8Array(reader.result), {type:'array', cellDates:false});
+      const name = wb.SheetNames.find(n=> normKey(n) === 'dados');
+      if(!name){ showToast('Este ficheiro não tem a folha "Dados". Usa o modelo (menu ⋯ → Modelo Excel).'); return; }
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, raw:true, defval:null});
+      const res = parseTemplateRows(rows, XLSX.SSF);
+      if(!res.sessions.length && !res.errors.length && !res.ignoredExample){ showToast('A folha "Dados" está vazia.'); return; }
+      showImportPreview(res, file.name);
+    }catch(err){
+      console.error(err);
+      showToast('Erro ao ler o Excel: ' + (err && err.message || err));
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
 
 // ---------- Calendário personalizado (o nativo não é redimensionável) ----------
 const MONTHS_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
